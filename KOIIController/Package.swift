@@ -6,7 +6,6 @@ import PackageDescription
 let package = Package(
     name: "KOIIController",
     platforms: [
-        .iOS(.v26),
         .macOS(.v26)
     ],
     dependencies: [
