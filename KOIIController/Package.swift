@@ -9,17 +9,17 @@ let package = Package(
         .macOS(.v26)
     ],
     dependencies: [
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.7.1"),
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.11.0"),
-        .package(url: "https://github.com/apple/swift-log.git", from: "1.6.0"),
-        .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.0.0")
+        .package(url: "https://github.com/orchetect/swift-midi", from: "1.1.0")
     ],
     targets: [
         .executableTarget(
             name: "KOIIController",
             dependencies: [
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "MCP", package: "swift-sdk"),
-                .product(name: "Logging", package: "swift-log"),
-                .product(name: "ServiceLifecycle", package: "swift-service-lifecycle")
+                .product(name: "SwiftMIDI", package: "swift-midi")
             ]
         )
     ],
