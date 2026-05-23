@@ -5,20 +5,24 @@ import PackageDescription
 
 let package = Package(
     name: "KOIIController",
-    products: [
-        // Products define the executables and libraries a package produces, making them visible to other packages.
-        .library(
-            name: "KOIIController",
-            targets: ["KOIIController"]
-        ),
+    platforms: [
+        .iOS(.v26),
+        .macOS(.v26)
+    ],
+    dependencies: [
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.11.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.6.0"),
+        .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.0.0")
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
-        .target(
-            name: "KOIIController"
-        ),
-
+        .executableTarget(
+            name: "KOIIController",
+            dependencies: [
+                .product(name: "MCP", package: "swift-sdk"),
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "ServiceLifecycle", package: "swift-service-lifecycle")
+            ]
+        )
     ],
     swiftLanguageModes: [.v6]
 )
