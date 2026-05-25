@@ -26,8 +26,7 @@ struct ResourceHandler {
             let midi = KOIIMIDIManager.shared
             let payload = DeviceStatusPayload(
                 isConnected: midi.isConnected,
-                connectedDevice: midi.connectedDeviceName,
-                availableDevices: midi.listDestinations()
+                connectedDeviceName: midi.connectedDeviceName
             )
             return .text(encodeJSON(payload), uri: uri, mimeType: "application/json")
 
@@ -66,8 +65,7 @@ struct ResourceHandler {
 // MARK: DeviceStatusPayload
 struct DeviceStatusPayload: Encodable {
     let isConnected: Bool
-    let connectedDevice: String?
-    let availableDevices: [String]
+    let connectedDeviceName: String?
 }
 
 // MARK: PadGroupLayout
