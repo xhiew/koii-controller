@@ -41,7 +41,7 @@ enum KOIIDevice {
     static func noteOn(
         group: KOIIGroup,
         pad: Int,
-        velocity: UInt7 = 100,
+        velocity: UInt7 = 80,
         channel: UInt4 = defaultChannel
     ) throws -> MIDIEvent {
         let note = try noteNumber(group: group, pad: pad)
