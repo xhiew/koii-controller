@@ -14,7 +14,7 @@ struct ToolHandler {
         await server.withMethodHandler(ListTools.self) { _ in
             ListTools.Result(tools: ToolDefinition.all)
         }
-
+        
         await server.withMethodHandler(CallTool.self) { params in
             do {
                 return try await dispatch(params)
@@ -26,7 +26,7 @@ struct ToolHandler {
             }
         }
     }
-
+    
     // MARK: Dispatch
     private static func dispatch(_ params: CallTool.Parameters) async throws -> CallTool.Result {
         switch params.name {
@@ -40,7 +40,7 @@ struct ToolHandler {
             )
         }
     }
-
+    
     // MARK: list_midi_outputs
     private static func listMidiOutputs() -> CallTool.Result {
         let devices = KOIIMIDIManager.shared.listDestinations()
@@ -48,7 +48,7 @@ struct ToolHandler {
             .text(text: encodeJSON(ListOutputsPayload(devices: devices)), annotations: nil, _meta: nil)
         ])
     }
-
+    
     // MARK: connect_device
     private static func connectDevice(_ arguments: [String: Value]?) throws -> CallTool.Result {
         guard let args = arguments,
@@ -62,7 +62,7 @@ struct ToolHandler {
             .text(text: "Connected to \"\(deviceName)\"\(note)", annotations: nil, _meta: nil)
         ])
     }
-
+    
     // MARK: disconnect_device
     private static func disconnectDevice() -> CallTool.Result {
         KOIIMIDIManager.shared.disconnect()
