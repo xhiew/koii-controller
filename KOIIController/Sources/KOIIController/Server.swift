@@ -6,3 +6,23 @@
 //
 
 import Foundation
+import MCP
+
+struct KOIIServer {
+    static func createServer() async -> Server {
+        let server = Server(
+            name: "KOIIServer",
+            version: "1.0.0",
+            capabilities: Server.Capabilities(
+                prompts: Server.Capabilities.Prompts(listChanged: false),
+                tools: Server.Capabilities.Tools(listChanged: false)
+            )
+        )
+        
+        // Register tool handlers
+        
+        // Register prompt handlers
+        
+        return server
+    }
+}
