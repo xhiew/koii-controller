@@ -8,7 +8,7 @@
 import Foundation
 import MCP
 
-enum KOIIResourceDefinition {
+enum ResourceDefinition {
     static let deviceLayoutURI = "koii://device/layout"
     
     static let all: [Resource] = [
