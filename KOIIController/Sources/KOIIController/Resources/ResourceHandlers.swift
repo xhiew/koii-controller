@@ -22,6 +22,15 @@ struct ResourceHandler {
     
     private static func content(for uri: String) -> Resource.Content {
         switch uri {
+        case ResourceDefinition.deviceStatusURI:
+            let midi = KOIIMIDIManager.shared
+            let payload = DeviceStatusPayload(
+                isConnected: midi.isConnected,
+                connectedDevice: midi.connectedDeviceName,
+                availableDevices: midi.listDestinations()
+            )
+            return .text(encodeJSON(payload), uri: uri, mimeType: "application/json")
+
         case ResourceDefinition.deviceLayoutURI:
             let groups = KOIIGroup.allCases.map { group in
                 let base = Int(group.baseNote)
@@ -52,6 +61,13 @@ struct ResourceHandler {
             )
         }
     }
+}
+
+// MARK: DeviceStatusPayload
+struct DeviceStatusPayload: Encodable {
+    let isConnected: Bool
+    let connectedDevice: String?
+    let availableDevices: [String]
 }
 
 // MARK: PadGroupLayout
