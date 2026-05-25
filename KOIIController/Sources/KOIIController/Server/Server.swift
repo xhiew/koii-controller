@@ -15,9 +15,12 @@ struct KOIIServer {
             version: "1.0.0",
             capabilities: Server.Capabilities(
                 prompts: Server.Capabilities.Prompts(listChanged: false),
+                resources: .init(subscribe: false, listChanged: false),
                 tools: Server.Capabilities.Tools(listChanged: false)
             )
         )
+        
+        await ResourceHandler.registerResourceHandlers(on: server)
         
         // Register tool handlers
         

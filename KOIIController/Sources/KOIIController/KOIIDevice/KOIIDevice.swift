@@ -31,9 +31,11 @@ enum KOIIDevice {
     static func noteNumber(group: KOIIGroup, pad: Int) throws -> UInt7 {
         guard (1...12).contains(pad) else { throw KOIIError.invalidPad(pad) }
         let number = Int(group.baseNote) + (pad - 1)
+        
         guard let note = UInt7(exactly: number) else {
             throw KOIIError.invalidParameter("Computed note \(number) is out of MIDI range 0–127")
         }
+        
         return note
     }
     
