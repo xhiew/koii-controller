@@ -15,7 +15,7 @@ struct KOIIServer {
             version: "1.0.0",
             capabilities: Server.Capabilities(
                 prompts: Server.Capabilities.Prompts(listChanged: false),
-                resources: .init(subscribe: false, listChanged: false),
+                resources: Server.Capabilities.Resources(subscribe: false, listChanged: false),
                 tools: Server.Capabilities.Tools(listChanged: false)
             )
         )

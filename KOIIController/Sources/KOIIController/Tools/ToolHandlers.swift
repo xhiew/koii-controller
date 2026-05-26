@@ -36,8 +36,9 @@ struct ToolHandler {
         case "transport_start":     return try transport(.start)
         case "transport_stop":      return try transport(.stop)
         case "transport_continue":  return try transport(.continue)
-        case "play_pad":            return try await playPad(params.arguments)
-        case "play_sequence":       return try await playSequence(params.arguments)
+        case "play_pad":             return try await playPad(params.arguments)
+        case "play_sequence":        return try await playSequence(params.arguments)
+        case "play_drum_pattern":    return try await playDrumPattern(params.arguments)
         default:
             return CallTool.Result(
                 content: [.text(text: "Unknown tool: \(params.name)", annotations: nil, _meta: nil)],
@@ -118,7 +119,6 @@ private extension ToolHandler {
     static func playPad(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         let req = try PlayPadRequest(from: arguments)
         try await playNoteCore(group: req.group, pad: req.pad, velocity: req.velocity, timing: req.timing, durationSteps: req.durationSteps)
-        let holdMs = Int(req.timing.stepDurationMs * Double(req.durationSteps))
         
         return CallTool.Result(
             content: [
@@ -150,6 +150,47 @@ private extension ToolHandler {
             content: [
                 .text(
                     text: "Played sequence: \(req.steps.count) note(s) @ \(Int(req.timing.bpm)) BPM.",
+                    annotations: nil,
+                    _meta: nil
+                )
+            ]
+        )
+    }
+    
+    static func playDrumPattern(_ arguments: [String: Value]?) async throws -> CallTool.Result {
+        let req = try DrumPatternRequest(from: arguments)
+        let sequenceStart = ContinuousClock.now
+        
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for step in 0..<req.stepCount {
+                let hits: [(UInt7, UInt7)] = req.lines.compactMap { line in
+                    guard step < line.hits.count, let velocity = line.hits[step] else { return nil }
+                    return (line.midiNote, velocity)
+                }
+                
+                guard !hits.isEmpty else { continue }
+                
+                let fireAt = sequenceStart + req.timing.fireTime(offsetSteps: step)
+                let holdNs = req.timing.holdNanoseconds(durationSteps: 1)
+                
+                group.addTask {
+                    try await Task.sleep(until: fireAt, clock: .continuous)
+                    for (note, velocity) in hits {
+                        try KOIIMIDIManager.shared.send(event: KOIIDevice.rawNoteOn(note: note, velocity: velocity))
+                    }
+                    try await Task.sleep(nanoseconds: holdNs)
+                    for (note, _) in hits {
+                        try KOIIMIDIManager.shared.send(event: KOIIDevice.rawNoteOff(note: note))
+                    }
+                }
+            }
+            try await group.waitForAll()
+        }
+        
+        return CallTool.Result(
+            content: [
+                .text(
+                    text: "Played drum pattern: \(req.lines.count) instrument(s), \(req.stepCount) steps @ \(Int(req.timing.bpm)) BPM.",
                     annotations: nil,
                     _meta: nil
                 )

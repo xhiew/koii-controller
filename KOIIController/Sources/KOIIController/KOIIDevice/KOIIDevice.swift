@@ -39,6 +39,44 @@ enum KOIIDevice {
         return note
     }
     
+    // Maps physical pad labels (A., A0, A1–A9, AFX) to MIDI note numbers.
+    // Physical layout per group (example Group A, base=36):
+    //   [A7=45][A8=46][A9=47]
+    //   [A4=42][A5=43][A6=44]
+    //   [A1=39][A2=40][A3=41]
+    //   [A.=36][A0=37][FX=38]
+    static func noteNumber(padLabel: String) throws -> UInt7 {
+        guard padLabel.count >= 2 else {
+            throw KOIIError.invalidParameter("Invalid pad label: \"\(padLabel)\"")
+        }
+        
+        let groupChar = String(padLabel.prefix(1)).uppercased()
+        guard let group = KOIIGroup(rawValue: groupChar) else {
+            throw KOIIError.invalidParameter("Unknown group \"\(groupChar)\" in pad label \"\(padLabel)\"")
+        }
+        
+        let suffix = String(padLabel.dropFirst()).uppercased()
+        let offset: Int
+        switch suffix {
+        case ".":   offset = 0
+        case "0":   offset = 1
+        case "FX":  offset = 2
+        default:
+            guard let num = Int(suffix), (1...9).contains(num) else {
+                throw KOIIError.invalidParameter("Invalid pad label \"\(padLabel)\". Suffix must be '.', '0', 'FX', or 1–9.")
+            }
+            let row = (num - 1) / 3
+            let col = (num - 1) % 3
+            offset = 3 + (row * 3) + col
+        }
+        
+        let number = Int(group.baseNote) + offset
+        guard let note = UInt7(exactly: number) else {
+            throw KOIIError.invalidParameter("Computed note \(number) is out of MIDI range 0–127")
+        }
+        return note
+    }
+    
     // MARK: Note events
     static func noteOn(
         group: KOIIGroup,

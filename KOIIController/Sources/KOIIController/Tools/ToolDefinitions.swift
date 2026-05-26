@@ -155,6 +155,37 @@ struct ToolDefinition {
                 ]),
                 "required": .array([.string("bpm"), .string("steps")])
             ])
+        ),
+        Tool(
+            name: "play_drum_pattern",
+            description: """
+            Plays a text-based drum pattern on the KO-II using a compact notation. \
+            Each line = one instrument; characters = hits per step (default: 16th note grid). \
+            Hit chars: 'x'/'X' = hard (vel 100), 'o'/'O' = soft (vel 60), '1'–'9' = velocity scale (1=14…9=126), any other char = rest. \
+            After '#' identify the instrument using a MIDI note number (0–127) or a pad label (A., A0, A1–A9, AFX, B., B0, B1–B9, etc.). \
+            Lines without a valid '#' reference are silently ignored. \
+            All voices are scheduled concurrently for accurate polyphony — no drift. \
+            Pass the pattern as a single string with \\n between lines. \
+            Example: "x...x...x...x...  # 36\\n....x.......x...  # 38\\nx.x.x.x.x.x.x.x.  # A0"
+            """,
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "pattern": .object([
+                        "type": .string("string"),
+                        "description": .string("Multi-line drum pattern string. Use \\n to separate instrument lines.")
+                    ]),
+                    "bpm": .object([
+                        "type": .string("number"),
+                        "description": .string("The KO-II's current BPM.")
+                    ]),
+                    "steps_per_beat": .object([
+                        "type": .string("integer"),
+                        "description": .string("Grid subdivision: 1=quarter, 2=eighth, 4=sixteenth (default), 3=eighth-triplet, 6=sixteenth-triplet.")
+                    ])
+                ]),
+                "required": .array([.string("pattern"), .string("bpm")])
+            ])
         )
     ]
 }
