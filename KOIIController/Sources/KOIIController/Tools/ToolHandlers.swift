@@ -37,6 +37,7 @@ struct ToolHandler {
         case "transport_stop":      return try transport(.stop)
         case "transport_continue":  return try transport(.continue)
         case "play_pad":            return try await playPad(params.arguments)
+        case "play_sequence":       return try await playSequence(params.arguments)
         default:
             return CallTool.Result(
                 content: [.text(text: "Unknown tool: \(params.name)", annotations: nil, _meta: nil)],
@@ -102,43 +103,53 @@ private extension ToolHandler {
 
 // MARK: Playback handlers
 private extension ToolHandler {
+    private static func playNoteCore(
+        group: KOIIGroup,
+        pad: Int,
+        velocity: UInt7,
+        timing: SequenceTiming,
+        durationSteps: Int
+    ) async throws {
+        try KOIIMIDIManager.shared.send(event: KOIIDevice.noteOn(group: group, pad: pad, velocity: velocity))
+        try await Task.sleep(nanoseconds: timing.holdNanoseconds(durationSteps: durationSteps))
+        try KOIIMIDIManager.shared.send(event: KOIIDevice.noteOff(group: group, pad: pad))
+    }
+    
     static func playPad(_ arguments: [String: Value]?) async throws -> CallTool.Result {
-        guard let args = arguments,
-              case .string(let groupStr) = args["group"],
-              let padVal = args["pad"]?.intValue else {
-            throw KOIIError.invalidParameter("group and pad are required")
-        }
+        let req = try PlayPadRequest(from: arguments)
+        try await playNoteCore(group: req.group, pad: req.pad, velocity: req.velocity, timing: req.timing, durationSteps: req.durationSteps)
+        let holdMs = Int(req.timing.stepDurationMs * Double(req.durationSteps))
         
-        guard let group = KOIIGroup(rawValue: groupStr.uppercased()) else {
-            throw KOIIError.invalidParameter("Unknown group: \"\(groupStr)\". Use A, B, C, or D.")
-        }
+        return CallTool.Result(
+            content: [
+                .text(
+                    text: "Played \(req.group.rawValue)\(req.pad) at velocity \(req.velocity), held \(req.durationSteps) step(s) @ \(Int(req.timing.bpm)) BPM.",
+                    annotations: nil,
+                    _meta: nil
+                )
+            ]
+        )
+    }
+    
+    static func playSequence(_ arguments: [String: Value]?) async throws -> CallTool.Result {
+        let req = try PlaySequenceRequest(from: arguments)
+        let sequenceStart = ContinuousClock.now
         
-        let velocity = args["velocity"]?.intValue.flatMap { UInt7(exactly: $0) } ?? 80
-        let bpm = args["bpm"]?.doubleValue
-        let stepsPerBeat = args["steps_per_beat"]?.intValue ?? 4
-        let durationSteps = args["duration_steps"]?.intValue ?? 1
-        
-        try KOIIMIDIManager.shared.send(event: KOIIDevice.noteOn(group: group, pad: padVal, velocity: velocity))
-        
-        if let bpm, bpm > 0 {
-            let durationMs = (60_000.0 / bpm / Double(stepsPerBeat)) * Double(durationSteps)
-            try await Task.sleep(nanoseconds: UInt64(durationMs * 1_000_000))
-        }
-        
-        try KOIIMIDIManager.shared.send(event: KOIIDevice.noteOff(group: group, pad: padVal))
-        
-        let durationDesc: String
-        if let bpm, bpm > 0 {
-            let ms = (60_000.0 / bpm / Double(stepsPerBeat)) * Double(durationSteps)
-            durationDesc = ", held \(durationSteps) step(s) @ \(Int(bpm)) BPM (\(Int(ms))ms)"
-        } else {
-            durationDesc = ""
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for step in req.steps {
+                group.addTask {
+                    let fireAt = sequenceStart + req.timing.fireTime(offsetSteps: step.offsetSteps)
+                    try await Task.sleep(until: fireAt, clock: .continuous)
+                    try await playNoteCore(group: step.group, pad: step.pad, velocity: step.velocity, timing: req.timing, durationSteps: step.durationSteps)
+                }
+            }
+            try await group.waitForAll()
         }
         
         return CallTool.Result(
-            content:[
+            content: [
                 .text(
-                    text: "Played \(groupStr.uppercased())\(padVal) at velocity \(velocity)\(durationDesc).",
+                    text: "Played sequence: \(req.steps.count) note(s) @ \(Int(req.timing.bpm)) BPM.",
                     annotations: nil,
                     _meta: nil
                 )
