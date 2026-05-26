@@ -79,9 +79,8 @@ enum KOIIDevice {
     
     // MARK: - Transport
     static func transportStart() -> MIDIEvent { .start(.init()) }
-    static func transportStop() -> MIDIEvent { .stop(.init()) }
-    static func transportContinue() -> MIDIEvent { .continue(.init()) }
     
-    // Call 24 times per quarter note to set tempo on the KO-II.
-    static func timingClock() -> MIDIEvent { .timingClock(.init()) }
+    static func transportStop() -> MIDIEvent { .stop(.init()) }
+    
+    static func transportContinue() -> MIDIEvent { .continue(.init()) }
 }
