@@ -55,18 +55,18 @@ struct ToolHandler {
               case .string(let deviceName) = args["deviceName"] else {
             throw KOIIError.invalidParameter("deviceName is required")
         }
+        
         try KOIIMIDIManager.shared.connect(deviceName: deviceName)
-        let isKOII = deviceName.contains("K.O") || deviceName.contains("EP-133")
-        let note = isKOII ? "" : " (Note: this server is optimised for the EP-133 K.O. II)"
+        
         return CallTool.Result(content: [
-            .text(text: "Connected to \"\(deviceName)\"\(note)", annotations: nil, _meta: nil)
+            .text(text: "Connected to \"\(deviceName) (Note: this server is optimised for the EP-133 K.O. II)", annotations: nil, _meta: nil)
         ])
     }
     
     // MARK: disconnect_device
     private static func disconnectDevice() -> CallTool.Result {
         KOIIMIDIManager.shared.disconnect()
-        return CallTool.Result(content: [.text(text: "Disconnected. Channel map reset to defaults.", annotations: nil, _meta: nil)])
+        return CallTool.Result(content: [.text(text: "The device has been disconnected.", annotations: nil, _meta: nil)])
     }
 }
 
