@@ -51,29 +51,35 @@ enum KOIIDevice {
         }
         
         let groupChar = String(padLabel.prefix(1)).uppercased()
+        
         guard let group = KOIIGroup(rawValue: groupChar) else {
             throw KOIIError.invalidParameter("Unknown group \"\(groupChar)\" in pad label \"\(padLabel)\"")
         }
         
         let suffix = String(padLabel.dropFirst()).uppercased()
         let offset: Int
+        
         switch suffix {
-        case ".":   offset = 0
-        case "0":   offset = 1
-        case "FX":  offset = 2
+        case ".":
+            offset = 0
+        case "0":
+            offset = 1
+        case "FX":
+            offset = 2
         default:
             guard let num = Int(suffix), (1...9).contains(num) else {
                 throw KOIIError.invalidParameter("Invalid pad label \"\(padLabel)\". Suffix must be '.', '0', 'FX', or 1–9.")
             }
+            
             let row = (num - 1) / 3
             let col = (num - 1) % 3
             offset = 3 + (row * 3) + col
         }
         
         let number = Int(group.baseNote) + offset
-        guard let note = UInt7(exactly: number) else {
-            throw KOIIError.invalidParameter("Computed note \(number) is out of MIDI range 0–127")
-        }
+        
+        guard let note = UInt7(exactly: number) else { throw KOIIError.invalidParameter("Computed note \(number) is out of MIDI range 0–127") }
+        
         return note
     }
     
