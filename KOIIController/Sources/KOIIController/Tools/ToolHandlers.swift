@@ -30,15 +30,24 @@ struct ToolHandler {
     // MARK: Dispatch
     private static func dispatch(_ params: CallTool.Parameters) async throws -> CallTool.Result {
         switch params.name {
-        case "list_midi_outputs":   return listMidiOutputs()
-        case "connect_device":      return try connectDevice(params.arguments)
-        case "disconnect_device":   return disconnectDevice()
-        case "transport_start":     return try transport(.start)
-        case "transport_stop":      return try transport(.stop)
-        case "transport_continue":  return try transport(.continue)
-        case "play_pad":             return try await playPad(params.arguments)
-        case "play_sequence":        return try await playSequence(params.arguments)
-        case "play_drum_pattern":    return try await playDrumPattern(params.arguments)
+        case "list_midi_outputs":
+            return listMidiOutputs()
+        case "connect_device":
+            return try connectDevice(params.arguments)
+        case "disconnect_device":
+            return disconnectDevice()
+        case "transport_start":
+            return try transport(.start)
+        case "transport_stop":
+            return try transport(.stop)
+        case "transport_continue":
+            return try transport(.continue)
+        case "play_pad":
+            return try await playPad(params.arguments)
+        case "play_sequence":
+            return try await playSequence(params.arguments)
+        case "play_drum_pattern":
+            return try await playDrumPattern(params.arguments)
         default:
             return CallTool.Result(
                 content: [.text(text: "Unknown tool: \(params.name)", annotations: nil, _meta: nil)],

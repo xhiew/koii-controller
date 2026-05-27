@@ -37,8 +37,7 @@ struct DrumPatternRequest: Sendable {
     }
 }
 
-// MARK: - Parsing
-
+// MARK: Parsing
 private extension DrumPatternRequest {
     static func parseLines(_ text: String) throws -> [DrumPatternLine] {
         var result: [DrumPatternLine] = []
