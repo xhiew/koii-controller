@@ -48,6 +48,9 @@ struct ToolHandler {
             return try await playSequence(params.arguments)
         case "play_drum_pattern":
             return try await playDrumPattern(params.arguments)
+        case "list_available_scales":
+            return listAvailableScales()
+            
         default:
             return CallTool.Result(
                 content: [.text(text: "Unknown tool: \(params.name)", annotations: nil, _meta: nil)],
@@ -200,6 +203,21 @@ private extension ToolHandler {
             content: [
                 .text(
                     text: "Played drum pattern: \(req.lines.count) instrument(s), \(req.stepCount) steps @ \(Int(req.timing.bpm)) BPM.",
+                    annotations: nil,
+                    _meta: nil
+                )
+            ]
+        )
+    }
+}
+
+// MARK: Scale handlers
+private extension ToolHandler {
+    static func listAvailableScales() -> CallTool.Result {
+        CallTool.Result(
+            content: [
+                .text(
+                    text: encodeJSON(KOIIScaleLibrary.descriptions),
                     annotations: nil,
                     _meta: nil
                 )

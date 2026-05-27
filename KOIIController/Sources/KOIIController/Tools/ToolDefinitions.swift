@@ -191,37 +191,6 @@ struct ToolDefinition {
             name: "list_available_scales",
             description: "Lists all musical scales available for Keys Mode on the KO-II, with interval descriptions. Call this to discover valid scale_name values for get_scale_mapping and play_scale_sequence.",
             inputSchema: .object(["type": .string("object"), "properties": .object([:])])
-        ),
-        Tool(
-            name: "get_scale_mapping",
-            description: """
-            Shows which pad in a KO-II group maps to which note when the device is in Keys Mode with a specific scale. \
-            Returns a list of {pad, midi_note, note_name} for the 11 playable pads (A./A0/A1–A9). \
-            Useful before calling play_scale_sequence to understand the layout.
-            """,
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "group": .object([
-                        "type": .string("string"),
-                        "enum": .array([.string("A"), .string("B"), .string("C"), .string("D")]),
-                        "description": .string("Pad group to show mapping for.")
-                    ]),
-                    "scale_name": .object([
-                        "type": .string("string"),
-                        "description": .string("Scale name, e.g. major, minor, blues, dorian. Use list_available_scales to see all options.")
-                    ]),
-                    "root_note": .object([
-                        "type": .string("string"),
-                        "description": .string("Root note, e.g. C, F#, Eb, Bb.")
-                    ]),
-                    "octave": .object([
-                        "type": .string("integer"),
-                        "description": .string("Starting octave for the root note (0–8). Default 3.")
-                    ])
-                ]),
-                "required": .array([.string("group"), .string("scale_name"), .string("root_note")])
-            ])
         )
     ]
 }
