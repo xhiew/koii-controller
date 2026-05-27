@@ -189,7 +189,7 @@ struct ToolDefinition {
         ),
         Tool(
             name: "list_available_scales",
-            description: "Lists all musical scales available for Keys Mode on the KO-II, with interval descriptions. Call this to discover valid scale_name values for get_scale_mapping and play_scale_sequence.",
+            description: "Lists all musical scales available for Keys Mode on the KO-II, with interval descriptions. Call this to discover valid scale_name values for play_scale_sequence.",
             inputSchema: .object(["type": .string("object"), "properties": .object([:])])
         )
     ]

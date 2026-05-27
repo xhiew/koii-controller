@@ -68,4 +68,29 @@ enum KOIIScaleLibrary {
         
         "chromatic": "Chromatic scale (all 12 semitones), intervals: [0..11]"
     ]
+
+    // Resolves a scale degree + octave to a MIDI note number.
+    // degree is 1-based; degrees beyond the scale length wrap into the next octave.
+    // octave 4 = middle C octave (C4 = MIDI 60).
+    static func midiNote(root: String, scaleName: String, degree: Int, octave: Int) throws -> UInt7 {
+        let normalizedRoot = root.prefix(1).uppercased() + root.dropFirst().lowercased()
+        guard let intervals = patterns[scaleName] else {
+            throw KOIIError.invalidParameter("Unknown scale '\(scaleName)'. Use list_available_scales to see valid options.")
+        }
+        guard let rootSemitone = noteToSemitone[normalizedRoot] else {
+            throw KOIIError.invalidParameter("Unknown root note '\(root)'. Use C, C#, Db, D, D#, Eb, E, F, F#, Gb, G, G#, Ab, A, A#, Bb, or B.")
+        }
+        guard degree >= 1 else {
+            throw KOIIError.invalidParameter("Degree must be >= 1")
+        }
+
+        let idx = (degree - 1) % intervals.count
+        let octaveOffset = (degree - 1) / intervals.count
+        let noteNumber = (octave + octaveOffset + 1) * 12 + rootSemitone + intervals[idx]
+
+        guard let note = UInt7(exactly: noteNumber) else {
+            throw KOIIError.invalidParameter("Computed note \(noteNumber) out of MIDI range 0–127")
+        }
+        return note
+    }
 }
