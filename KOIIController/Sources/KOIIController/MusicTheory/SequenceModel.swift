@@ -12,9 +12,16 @@ import SwiftMIDI
 struct SequenceTiming {
     let bpm: Double
     let stepsPerBeat: Int
+    let beatsPerBar: Int
     
-    var stepDurationMs: Double {
-        60_000.0 / bpm / Double(stepsPerBeat)
+    var stepsPerBar: Int { stepsPerBeat * beatsPerBar }
+    
+    var stepDurationMs: Double { 60_000.0 / bpm / Double(stepsPerBeat) }
+    
+    var barDurationMs: Double { stepDurationMs * Double(stepsPerBar) }
+    
+    func offsetSteps(bar: Int, beat: Int, stepInBeat: Int = 1) -> Int {
+        (bar - 1) * stepsPerBar + (beat - 1) * stepsPerBeat + (stepInBeat - 1)
     }
     
     func fireTime(offsetSteps: Int) -> Duration {

@@ -50,12 +50,20 @@ struct ToolHandler {
             return try await playDrumPattern(params.arguments)
         case "list_available_scales":
             return listAvailableScales()
-            
         default:
             return CallTool.Result(
                 content: [.text(text: "Unknown tool: \(params.name)", annotations: nil, _meta: nil)],
                 isError: true
             )
+        }
+    }
+}
+
+// MARK: Connection guard
+private extension ToolHandler {
+    static func requireConnected() throws {
+        guard KOIIMIDIManager.shared.isConnected else {
+            throw KOIIError.invalidParameter("No device connected. Call list_midi_outputs to find available devices, then connect_device.")
         }
     }
 }
@@ -68,15 +76,8 @@ private extension ToolHandler {
     
     static func listMidiOutputs() -> CallTool.Result {
         let devices = KOIIMIDIManager.shared.listDestinations()
-        
         return CallTool.Result(
-            content:[
-                .text(
-                    text: encodeJSON(ListOutputsPayload(devices: devices)),
-                    annotations: nil,
-                    _meta: nil
-                )
-            ]
+            content: [.text(text: encodeJSON(ListOutputsPayload(devices: devices)), annotations: nil, _meta: nil)]
         )
     }
     
@@ -89,13 +90,7 @@ private extension ToolHandler {
         try KOIIMIDIManager.shared.connect(deviceName: deviceName)
         
         return CallTool.Result(
-            content:[
-                .text(
-                    text: "Connected to \"\(deviceName)\". (Note: this server is optimised for the EP-133 K.O. II)",
-                    annotations: nil,
-                    _meta: nil
-                )
-            ]
+            content: [.text(text: "Connected to \"\(deviceName)\". (Note: this server is optimised for the EP-133 K.O. II)", annotations: nil, _meta: nil)]
         )
     }
     
@@ -103,13 +98,7 @@ private extension ToolHandler {
         KOIIMIDIManager.shared.disconnect()
         
         return CallTool.Result(
-            content:[
-                .text(
-                    text: "The device has been disconnected.",
-                    annotations: nil,
-                    _meta: nil
-                )
-            ]
+            content: [.text(text: "The device has been disconnected.", annotations: nil, _meta: nil)]
         )
     }
 }
@@ -129,21 +118,29 @@ private extension ToolHandler {
     }
     
     static func playPad(_ arguments: [String: Value]?) async throws -> CallTool.Result {
+        try requireConnected()
+        
         let req = try PlayPadRequest(from: arguments)
+        
         try await playNoteCore(group: req.group, pad: req.pad, velocity: req.velocity, timing: req.timing, durationSteps: req.durationSteps)
         
         return CallTool.Result(
-            content: [
-                .text(
-                    text: "Played \(req.group.rawValue)\(req.pad) at velocity \(req.velocity), held \(req.durationSteps) step(s) @ \(Int(req.timing.bpm)) BPM.",
-                    annotations: nil,
-                    _meta: nil
-                )
-            ]
+            content: [.text(text: "Played \(req.group.rawValue)\(req.pad) at velocity \(req.velocity), held \(req.durationSteps) step(s) @ \(Int(req.timing.bpm)) BPM.", annotations: nil, _meta: nil)]
         )
     }
     
+    private struct PlaySequenceResponse: Encodable {
+        let status: String
+        let notesPlayed: Int
+        let bars: Int
+        let beatsPerBar: Int
+        let bpm: Double
+        let stepMs: Double
+        let totalDurationMs: Double
+    }
+    
     static func playSequence(_ arguments: [String: Value]?) async throws -> CallTool.Result {
+        try requireConnected()
         let req = try PlaySequenceRequest(from: arguments)
         let sequenceStart = ContinuousClock.now
         
@@ -158,18 +155,34 @@ private extension ToolHandler {
             try await group.waitForAll()
         }
         
+        let response = PlaySequenceResponse(
+            status: "OK",
+            notesPlayed: req.steps.count,
+            bars: req.totalBars,
+            beatsPerBar: req.timing.beatsPerBar,
+            bpm: req.timing.bpm,
+            stepMs: req.timing.stepDurationMs,
+            totalDurationMs: req.timing.barDurationMs * Double(req.totalBars)
+        )
+        
         return CallTool.Result(
-            content: [
-                .text(
-                    text: "Played sequence: \(req.steps.count) note(s) @ \(Int(req.timing.bpm)) BPM.",
-                    annotations: nil,
-                    _meta: nil
-                )
-            ]
+            content: [.text(text: encodeJSON(response), annotations: nil, _meta: nil)]
         )
     }
     
+    private struct DrumPatternResponse: Encodable {
+        let status: String
+        let instrumentsPlayed: Int
+        let steps: Int
+        let bars: Int
+        let beatsPerBar: Int
+        let bpm: Double
+        let stepMs: Double
+        let totalDurationMs: Double
+    }
+    
     static func playDrumPattern(_ arguments: [String: Value]?) async throws -> CallTool.Result {
+        try requireConnected()
         let req = try DrumPatternRequest(from: arguments)
         let sequenceStart = ContinuousClock.now
         
@@ -179,7 +192,6 @@ private extension ToolHandler {
                     guard step < line.hits.count, let velocity = line.hits[step] else { return nil }
                     return (line.midiNote, velocity)
                 }
-                
                 guard !hits.isEmpty else { continue }
                 
                 let fireAt = sequenceStart + req.timing.fireTime(offsetSteps: step)
@@ -199,14 +211,18 @@ private extension ToolHandler {
             try await group.waitForAll()
         }
         
+        let response = DrumPatternResponse(
+            status: "OK",
+            instrumentsPlayed: req.lines.count,
+            steps: req.stepCount,
+            bars: req.totalBars,
+            beatsPerBar: req.timing.beatsPerBar,
+            bpm: req.timing.bpm,
+            stepMs: req.timing.stepDurationMs,
+            totalDurationMs: req.timing.stepDurationMs * Double(req.stepCount)
+        )
         return CallTool.Result(
-            content: [
-                .text(
-                    text: "Played drum pattern: \(req.lines.count) instrument(s), \(req.stepCount) steps @ \(Int(req.timing.bpm)) BPM.",
-                    annotations: nil,
-                    _meta: nil
-                )
-            ]
+            content: [.text(text: encodeJSON(response), annotations: nil, _meta: nil)]
         )
     }
 }
@@ -215,13 +231,7 @@ private extension ToolHandler {
 private extension ToolHandler {
     static func listAvailableScales() -> CallTool.Result {
         CallTool.Result(
-            content: [
-                .text(
-                    text: encodeJSON(KOIIScaleLibrary.descriptions),
-                    annotations: nil,
-                    _meta: nil
-                )
-            ]
+            content: [.text(text: encodeJSON(KOIIScaleLibrary.descriptions), annotations: nil, _meta: nil)]
         )
     }
 }
@@ -231,6 +241,7 @@ private enum TransportAction { case start, stop, `continue` }
 
 private extension ToolHandler {
     static func transport(_ action: TransportAction) throws -> CallTool.Result {
+        try requireConnected()
         let event: MIDIEvent
         let label: String
         
@@ -249,13 +260,7 @@ private extension ToolHandler {
         try KOIIMIDIManager.shared.send(event: event)
         
         return CallTool.Result(
-            content:[
-                .text(
-                    text: "Transport \(label) sent.",
-                    annotations: nil,
-                    _meta: nil
-                )
-            ]
+            content: [.text(text: "Transport \(label) sent.", annotations: nil, _meta: nil)]
         )
     }
 }
