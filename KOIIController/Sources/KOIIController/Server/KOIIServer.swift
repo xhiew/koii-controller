@@ -20,11 +20,11 @@ struct KOIIServer {
             )
         )
         
-        await ResourceHandler.registerResourceHandlers(on: server)
-        
         await ToolHandler.registerToolHandlers(on: server)
         
-        // Register prompt handlers
+        await ResourceHandler.registerResourceHandlers(on: server)
+        
+        await PromptHandler.registerPromptHandlers(on: server)
         
         return server
     }
