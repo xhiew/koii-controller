@@ -23,6 +23,7 @@ struct ToolDefinition {
                 "properties": .object([
                     "device_name": .object([
                         "type": .string("string"),
+                        "default": .string("EP-133"),
                         "description": .string("Exact MIDI port name as returned by list_midi_outputs")
                     ])
                 ]),
@@ -77,7 +78,8 @@ struct ToolDefinition {
                         "type": .string("integer"),
                         "minimum": .int(0),
                         "maximum": .int(127),
-                        "description": .string("Velocity 0–127, default 80")
+                        "default": .int(80),
+                        "description": .string("Velocity 0–127")
                     ]),
                     "bpm": .object([
                         "type": .string("number"),
@@ -85,11 +87,13 @@ struct ToolDefinition {
                     ]),
                     "steps_per_beat": .object([
                         "type": .string("integer"),
-                        "description": .string("Grid subdivision: 1=quarter, 2=eighth, 4=sixteenth, 3=eighth-triplet, 6=sixteenth-triplet. Default 4.")
+                        "default": .int(4),
+                        "description": .string("Grid subdivision: 1=quarter, 2=eighth, 4=sixteenth, 3=eighth-triplet, 6=sixteenth-triplet.")
                     ]),
                     "duration_steps": .object([
                         "type": .string("integer"),
-                        "description": .string("How many steps to hold the note before noteOff. Default 1.")
+                        "default": .int(1),
+                        "description": .string("How many steps to hold the note before noteOff.")
                     ])
                 ]),
                 "required": .array([.string("group"), .string("pad"), .string("bpm")])
@@ -116,11 +120,13 @@ struct ToolDefinition {
                     ]),
                     "beats_per_bar": .object([
                         "type": .string("integer"),
-                        "description": .string("Beats per bar. Common signatures: 4/4→4, 3/4→3, 5/4→5, 6/8→6 (pair with steps_per_beat=2). Total steps per bar = beats_per_bar × steps_per_beat. Default 4.")
+                        "default": .int(4),
+                        "description": .string("Beats per bar. Common signatures: 4/4→4, 3/4→3, 5/4→5, 6/8→6 (pair with steps_per_beat=2). Total steps per bar = beats_per_bar × steps_per_beat.")
                     ]),
                     "steps_per_beat": .object([
                         "type": .string("integer"),
-                        "description": .string("Grid subdivision: 1=quarter, 2=eighth, 4=sixteenth, 3=eighth-triplet, 6=sixteenth-triplet. Default 4.")
+                        "default": .int(4),
+                        "description": .string("Grid subdivision: 1=quarter, 2=eighth, 4=sixteenth, 3=eighth-triplet, 6=sixteenth-triplet.")
                     ]),
                     "steps": .object([
                         "type": .string("array"),
@@ -158,11 +164,13 @@ struct ToolDefinition {
                                     "type": .string("integer"),
                                     "minimum": .int(0),
                                     "maximum": .int(127),
-                                    "description": .string("Velocity 0–127, default 80.")
+                                    "default": .int(80),
+                                    "description": .string("Velocity 0–127.")
                                 ]),
                                 "duration_steps": .object([
                                     "type": .string("integer"),
-                                    "description": .string("Steps to hold before noteOff. Default 1.")
+                                    "default": .int(1),
+                                    "description": .string("Steps to hold before noteOff.")
                                 ])
                             ]),
                             "required": .array([.string("group"), .string("pad"), .string("bar"), .string("beat")])
@@ -200,7 +208,8 @@ struct ToolDefinition {
                     ]),
                     "beats_per_bar": .object([
                         "type": .string("integer"),
-                        "description": .string("Beats per bar. Common signatures: 4/4→4, 3/4→3, 5/4→5, 6/8→6 (pair with steps_per_beat=2). Default 4.")
+                        "default": .int(4),
+                        "description": .string("Beats per bar. Common signatures: 4/4→4, 3/4→3, 5/4→5, 6/8→6 (pair with steps_per_beat=2).")
                     ]),
                     "steps_per_beat": .object([
                         "type": .string("integer"),
