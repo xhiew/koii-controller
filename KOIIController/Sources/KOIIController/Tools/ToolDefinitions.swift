@@ -101,16 +101,22 @@ struct ToolDefinition {
             ])
         ),
         Tool(
-            name: "play_sequence",
+            name: "play_key_mode",
             description: """
-            Plays multiple pads with precise timing on the KO-II. \
+            Plays a melodic sequence on the KO-II's Keys Mode using musical scale degrees. \
             Requires an active connection — call connect_device first. \
-            All steps share the same bpm, beats_per_bar, and steps_per_beat grid. \
+            The sequence-wide root, scale_name, and octave define the key; each step picks a degree within that scale. \
+            Degree is 1-based — degree=1 is the root note. Degrees beyond the scale length wrap into the next octave \
+            (e.g. in C major: degree=1 → C, degree=8 → C one octave higher, degree=15 → C two octaves higher). \
+            Each step can optionally override the sequence-wide octave to shape melody contour. \
+            For atonal or chromatic passages, set scale_name="chromatic" and use degrees 1–12 for the 12 semitones. \
+            Octave numbering follows Yamaha convention: C4 = middle C = MIDI 60. Useful octaves: 3 (low/bass), 4 (middle), 5 (high). \
             Position each note by musical time — bar (1-based), beat (1-based within bar), \
             and step_in_beat (1-based subdivision within the beat, default 1). \
             Example: bar=1 beat=3 step_in_beat=1 = downbeat of beat 3; bar=2 beat=1 step_in_beat=3 with steps_per_beat=4 = the 'e' of beat 1 in bar 2. \
-            Steps are scheduled concurrently so polyphony and simultaneous hits work correctly. \
+            Steps are scheduled concurrently so polyphony and simultaneous notes work correctly. \
             Use steps_per_beat=3 for eighth-triplet feel, 6 for sixteenth-triplet. \
+            Call list_available_scales to see all 11 supported scales. \
             MIDI is sent on channel 0 (the KO-II's default).
             """,
             inputSchema: .object([
@@ -130,22 +136,33 @@ struct ToolDefinition {
                         "default": .int(4),
                         "description": .string("Grid subdivision: 1=quarter, 2=eighth, 4=sixteenth, 3=eighth-triplet, 6=sixteenth-triplet.")
                     ]),
+                    "root": .object([
+                        "type": .string("string"),
+                        "default": .string("C"),
+                        "description": .string("Root note of the scale. Accepts: C, C#/Db, D, D#/Eb, E, F, F#/Gb, G, G#/Ab, A, A#/Bb, B.")
+                    ]),
+                    "scale_name": .object([
+                        "type": .string("string"),
+                        "default": .string("major"),
+                        "description": .string("Scale name. Call list_available_scales for the full list (major, minor, dorian, phrygian, lydian, mixolydian, locrian, major_pentatonic, minor_pentatonic, blues, chromatic).")
+                    ]),
+                    "octave": .object([
+                        "type": .string("integer"),
+                        "minimum": .int(0),
+                        "maximum": .int(9),
+                        "default": .int(4),
+                        "description": .string("Default octave for all steps (per-step octave overrides this). Yamaha convention: C4 = middle C = MIDI 60.")
+                    ]),
                     "steps": .object([
                         "type": .string("array"),
                         "description": .string("Array of notes to play."),
                         "items": .object([
                             "type": .string("object"),
                             "properties": .object([
-                                "group": .object([
-                                    "type": .string("string"),
-                                    "enum": .array([.string("A"), .string("B"), .string("C"), .string("D")]),
-                                    "description": .string("Group name")
-                                ]),
-                                "pad": .object([
+                                "degree": .object([
                                     "type": .string("integer"),
                                     "minimum": .int(1),
-                                    "maximum": .int(12),
-                                    "description": .string("Pad number 1–12")
+                                    "description": .string("Scale degree (1-based). 1=root note. Wraps above scale length: in major (7 notes), degree=8 = octave +1, degree=15 = octave +2.")
                                 ]),
                                 "bar": .object([
                                     "type": .string("integer"),
@@ -155,12 +172,19 @@ struct ToolDefinition {
                                 "beat": .object([
                                     "type": .string("integer"),
                                     "minimum": .int(1),
-                                    "description": .string("Beat within the bar (1-based).")
+                                    "description": .string("Beat within the bar (1-based). Must be ≤ beats_per_bar.")
                                 ]),
                                 "step_in_beat": .object([
                                     "type": .string("integer"),
                                     "minimum": .int(1),
-                                    "description": .string("Subdivision within the beat (1-based, default 1). With steps_per_beat=4: 1=downbeat, 2=e, 3=and, 4=ah.")
+                                    "default": .int(1),
+                                    "description": .string("Subdivision within the beat (1-based). Must be ≤ steps_per_beat. With steps_per_beat=4: 1=downbeat, 2=e, 3=and, 4=ah.")
+                                ]),
+                                "octave": .object([
+                                    "type": .string("integer"),
+                                    "minimum": .int(0),
+                                    "maximum": .int(9),
+                                    "description": .string("Optional. Overrides the sequence-wide octave for this single note (useful for melody contour — jumping up/down an octave). Omit to inherit.")
                                 ]),
                                 "velocity": .object([
                                     "type": .string("integer"),
@@ -171,11 +195,12 @@ struct ToolDefinition {
                                 ]),
                                 "duration_steps": .object([
                                     "type": .string("integer"),
+                                    "minimum": .int(1),
                                     "default": .int(1),
-                                    "description": .string("Steps to hold before noteOff.")
+                                    "description": .string("Steps to hold before noteOff. Matters for sustain — longer values give longer notes.")
                                 ])
                             ]),
-                            "required": .array([.string("group"), .string("pad"), .string("bar"), .string("beat")])
+                            "required": .array([.string("degree"), .string("bar"), .string("beat")])
                         ])
                     ])
                 ]),
@@ -224,7 +249,7 @@ struct ToolDefinition {
         ),
         Tool(
             name: "list_available_scales",
-            description: "Lists all musical scales available for Keys Mode on the KO-II, with interval descriptions. Call this to discover valid scale_name values for play_scale_sequence.",
+            description: "Lists all musical scales available for Keys Mode on the KO-II, with interval descriptions. Use this as a reference to compute MIDI notes for play_key_mode (e.g. C major from root 60 → 60, 62, 64, 65, 67, 69, 71).",
             inputSchema: .object(["type": .string("object"), "properties": .object([:])])
         )
     ]

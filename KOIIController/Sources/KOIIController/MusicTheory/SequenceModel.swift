@@ -35,8 +35,7 @@ struct SequenceTiming {
 
 // MARK: SequenceStep
 struct SequenceStep {
-    let group: KOIIGroup
-    let pad: Int
+    let midiNote: UInt7
     let velocity: UInt7
     let offsetSteps: Int
     let durationSteps: Int

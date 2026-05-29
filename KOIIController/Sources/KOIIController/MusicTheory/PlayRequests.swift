@@ -39,7 +39,7 @@ struct PlayPadRequest {
     }
 }
 
-struct PlaySequenceRequest {
+struct PlayKeyModeRequest {
     let timing: SequenceTiming
     let steps: [SequenceStep]
     
@@ -50,28 +50,72 @@ struct PlaySequenceRequest {
             throw KOIIError.invalidParameter("bpm and steps are required")
         }
         
+        guard !stepsArr.isEmpty else { throw KOIIError.invalidParameter("steps must contain at least one note") }
+        
         let beatsPerBar = args["beats_per_bar"]?.intValue ?? 4
         let stepsPerBeat = args["steps_per_beat"]?.intValue ?? 4
-        let timing = SequenceTiming(bpm: bpmVal, stepsPerBeat: stepsPerBeat, beatsPerBar: beatsPerBar)
         
+        guard beatsPerBar >= 1 else { throw KOIIError.invalidParameter("beats_per_bar must be >= 1") }
+        guard stepsPerBeat >= 1 else { throw KOIIError.invalidParameter("steps_per_beat must be >= 1") }
+        
+        let rootName: String = (args["root"].flatMap { if case .string(let s) = $0 { return s } else { return nil } }) ?? "C"
+        let scaleName: String = (args["scale_name"].flatMap { if case .string(let s) = $0 { return s } else { return nil } }) ?? "major"
+        let defaultOctave = args["octave"]?.intValue ?? 4
+        
+        guard (0...9).contains(defaultOctave) else {
+            throw KOIIError.invalidParameter("octave must be in 0...9, got \(defaultOctave)")
+        }
+        
+        let timing = SequenceTiming(bpm: bpmVal, stepsPerBeat: stepsPerBeat, beatsPerBar: beatsPerBar)
         var steps: [SequenceStep] = []
         
         for (i, item) in stepsArr.enumerated() {
             guard case .object(let step) = item,
-                  case .string(let groupStr) = step["group"],
-                  let group = KOIIGroup(rawValue: groupStr.uppercased()),
-                  let pad = step["pad"]?.intValue,
+                  let degree = step["degree"]?.intValue,
                   let bar = step["bar"]?.intValue,
                   let beat = step["beat"]?.intValue else {
-                throw KOIIError.invalidParameter("Step \(i): group, pad, bar, and beat are required")
+                throw KOIIError.invalidParameter("Step \(i): degree, bar, and beat are required")
+            }
+            
+            guard bar >= 1 else { throw KOIIError.invalidParameter("Step \(i): bar must be >= 1, got \(bar)") }
+            guard beat >= 1, beat <= beatsPerBar else {
+                throw KOIIError.invalidParameter("Step \(i): beat must be in 1...\(beatsPerBar), got \(beat)")
             }
             
             let stepInBeat = step["step_in_beat"]?.intValue ?? 1
-            let offsetSteps = timing.offsetSteps(bar: bar, beat: beat, stepInBeat: stepInBeat)
-            let velocity = step["velocity"]?.intValue.flatMap { UInt7(exactly: $0) } ?? 80
-            let durationSteps = step["duration_steps"]?.intValue ?? 1
+            guard stepInBeat >= 1, stepInBeat <= stepsPerBeat else {
+                throw KOIIError.invalidParameter("Step \(i): step_in_beat must be in 1...\(stepsPerBeat), got \(stepInBeat)")
+            }
             
-            steps.append(SequenceStep(group: group, pad: pad, velocity: velocity, offsetSteps: offsetSteps, durationSteps: durationSteps))
+            let effectiveOctave: Int
+            if let stepOctave = step["octave"]?.intValue {
+                guard (0...9).contains(stepOctave) else {
+                    throw KOIIError.invalidParameter("Step \(i): octave must be in 0...9, got \(stepOctave)")
+                }
+                effectiveOctave = stepOctave
+            } else {
+                effectiveOctave = defaultOctave
+            }
+            
+            let velocityRaw = step["velocity"]?.intValue ?? 80
+            guard let velocity = UInt7(exactly: velocityRaw) else {
+                throw KOIIError.invalidParameter("Step \(i): velocity must be in 0...127, got \(velocityRaw)")
+            }
+            
+            let durationSteps = step["duration_steps"]?.intValue ?? 1
+            guard durationSteps >= 1 else {
+                throw KOIIError.invalidParameter("Step \(i): duration_steps must be >= 1, got \(durationSteps)")
+            }
+            
+            let midiNote: UInt7
+            do {
+                midiNote = try KOIIScaleLibrary.midiNote(root: rootName, scaleName: scaleName, degree: degree, octave: effectiveOctave)
+            } catch {
+                throw KOIIError.invalidParameter("Step \(i): \(error.localizedDescription)")
+            }
+            
+            let offsetSteps = timing.offsetSteps(bar: bar, beat: beat, stepInBeat: stepInBeat)
+            steps.append(SequenceStep(midiNote: midiNote, velocity: velocity, offsetSteps: offsetSteps, durationSteps: durationSteps))
         }
         
         self.timing = timing

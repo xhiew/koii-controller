@@ -44,8 +44,8 @@ struct ToolHandler {
             return try transport(.continue)
         case "play_pad":
             return try await playPad(params.arguments)
-        case "play_sequence":
-            return try await playSequence(params.arguments)
+        case "play_key_mode":
+            return try await playKeyMode(params.arguments)
         case "play_drum_pattern":
             return try await playDrumPattern(params.arguments)
         case "list_available_scales":
@@ -129,17 +129,19 @@ private extension ToolHandler {
         )
     }
     
-    private struct PlaySequenceResponse: Encodable {
+    private struct PlayKeyModeResponse: Encodable {
         let status: String
         let notesPlayed: Int
         let beatsPerBar: Int
+        let stepsPerBeat: Int
         let bpm: Double
         let stepMs: Double
+        let totalDurationMs: Double
     }
     
-    static func playSequence(_ arguments: [String: Value]?) async throws -> CallTool.Result {
+    static func playKeyMode(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         try requireConnected()
-        let req = try PlaySequenceRequest(from: arguments)
+        let req = try PlayKeyModeRequest(from: arguments)
         let sequenceStart = ContinuousClock.now
         
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -147,18 +149,25 @@ private extension ToolHandler {
                 group.addTask {
                     let fireAt = sequenceStart + req.timing.fireTime(offsetSteps: step.offsetSteps)
                     try await Task.sleep(until: fireAt, clock: .continuous)
-                    try await playNoteCore(group: step.group, pad: step.pad, velocity: step.velocity, timing: req.timing, durationSteps: step.durationSteps)
+                    try KOIIMIDIManager.shared.send(event: KOIIDevice.rawNoteOn(note: step.midiNote, velocity: step.velocity))
+                    try await Task.sleep(nanoseconds: req.timing.holdNanoseconds(durationSteps: step.durationSteps))
+                    try KOIIMIDIManager.shared.send(event: KOIIDevice.rawNoteOff(note: step.midiNote))
                 }
             }
             try await group.waitForAll()
         }
         
-        let response = PlaySequenceResponse(
+        let maxEndStep = req.steps.map { $0.offsetSteps + $0.durationSteps }.max() ?? 0
+        let totalDurationMs = req.timing.stepDurationMs * Double(maxEndStep)
+        
+        let response = PlayKeyModeResponse(
             status: "OK",
             notesPlayed: req.steps.count,
             beatsPerBar: req.timing.beatsPerBar,
+            stepsPerBeat: req.timing.stepsPerBeat,
             bpm: req.timing.bpm,
             stepMs: req.timing.stepDurationMs,
+            totalDurationMs: totalDurationMs
         )
         
         return CallTool.Result(
