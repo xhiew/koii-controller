@@ -21,12 +21,12 @@ struct ToolDefinition {
             inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
-                    "deviceName": .object([
+                    "device_name": .object([
                         "type": .string("string"),
                         "description": .string("Exact MIDI port name as returned by list_midi_outputs")
                     ])
                 ]),
-                "required": .array([.string("deviceName")])
+                "required": .array([.string("device_name")])
             ])
         ),
         Tool(

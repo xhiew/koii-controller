@@ -83,8 +83,8 @@ private extension ToolHandler {
     
     static func connectDevice(_ arguments: [String: Value]?) throws -> CallTool.Result {
         guard let args = arguments,
-              case .string(let deviceName) = args["deviceName"] else {
-            throw KOIIError.invalidParameter("deviceName is required")
+              case .string(let deviceName) = args["device_name"] else {
+            throw KOIIError.invalidParameter("device_name is required")
         }
         
         try KOIIMIDIManager.shared.connect(deviceName: deviceName)
