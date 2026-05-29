@@ -23,8 +23,7 @@ struct ToolDefinition {
                 "properties": .object([
                     "device_name": .object([
                         "type": .string("string"),
-                        "default": .string("EP-133"),
-                        "description": .string("Exact MIDI port name as returned by list_midi_outputs")
+                        "description": .string("Exact MIDI port name as returned by list_midi_outputs. Always call list_midi_outputs first to get the real name — do NOT guess.")
                     ])
                 ]),
                 "required": .array([.string("device_name")])
@@ -54,6 +53,7 @@ struct ToolDefinition {
             name: "play_pad",
             description: """
             Triggers a single pad on the KO-II. Groups A/B/C/D each have pads 1–12. \
+            Use this for single hits, audition, or testing a pad — NOT for grooves or beat patterns. For drum patterns use play_drum_pattern; for melodies use play_key_mode. \
             Requires an active connection — call connect_device first. \
             bpm is required — set it to the KO-II's current tempo. \
             steps_per_beat sets the grid (4=16th, 2=8th, 1=quarter, 3=8th-triplet, 6=16th-triplet, default 4). \
@@ -80,7 +80,7 @@ struct ToolDefinition {
                         "minimum": .int(0),
                         "maximum": .int(127),
                         "default": .int(80),
-                        "description": .string("Velocity 0–127")
+                        "description": .string("Velocity 0–127. Common values: 100=hard accent, 80=normal hit, 60=soft, 30=ghost note.")
                     ]),
                     "bpm": .object([
                         "type": .string("number"),
@@ -117,7 +117,8 @@ struct ToolDefinition {
             Steps are scheduled concurrently so polyphony and simultaneous notes work correctly. \
             Use steps_per_beat=3 for eighth-triplet feel, 6 for sixteenth-triplet. \
             Call list_available_scales to see all 11 supported scales. \
-            MIDI is sent on channel 0 (the KO-II's default).
+            MIDI is sent on channel 0 (the KO-II's default). \
+            Example: {"bpm":120,"root":"C","scale_name":"major","octave":4,"steps":[{"degree":1,"bar":1,"beat":1},{"degree":3,"bar":1,"beat":2},{"degree":5,"bar":1,"beat":3},{"degree":8,"bar":1,"beat":4},{"degree":5,"bar":2,"beat":1,"octave":5,"duration_steps":4}]}
             """,
             inputSchema: .object([
                 "type": .string("object"),
@@ -191,7 +192,7 @@ struct ToolDefinition {
                                     "minimum": .int(0),
                                     "maximum": .int(127),
                                     "default": .int(80),
-                                    "description": .string("Velocity 0–127.")
+                                    "description": .string("Velocity 0–127. Common values: 100=hard accent, 80=normal hit, 60=soft, 30=ghost note.")
                                 ]),
                                 "duration_steps": .object([
                                     "type": .string("integer"),
@@ -213,14 +214,15 @@ struct ToolDefinition {
             Plays a text-based drum pattern on the KO-II using a compact notation. \
             Requires an active connection — call connect_device first. \
             Each line = one instrument; each character = one grid step. \
-            Hit chars: 'x'/'X' = hard (vel 100), 'o'/'O' = soft (vel 60), '1'–'9' = velocity scale (1=14…9=126), any other char = rest. \
+            Hit chars: 'x'/'X' = hard (vel 100), 'o'/'O' = soft (vel 60), '1'–'9' = velocity scale (1=14…9=126). Any other char (including '.', '-', or space) = rest. \
+            WARNING: every single character (including spaces) counts as one step. Do NOT use spaces to visually group beats — use '.' instead. "x. . . x. . ." is 8 steps, not 4. \
             After '#' identify the instrument using a MIDI note number (0–127) or a pad label (A., A0, A1–A9, AFX, B., B0, B1–B9, etc.). \
             Lines without a valid '#' reference are silently ignored. \
-            Pattern length determines bar count: steps_per_bar = beats_per_bar × steps_per_beat. \
+            Pattern length should be a multiple of steps_per_bar (= beats_per_bar × steps_per_beat) so bars align cleanly. Lines shorter than the longest line stay silent for the missing steps. \
             Time signatures: 4/4 with 16th grid → 16 chars/bar; 3/4 with 16th grid → 12 chars/bar; 6/8 (steps_per_beat=2) → 12 chars/bar. \
             All voices are scheduled concurrently for accurate polyphony — no drift. \
             Pass the pattern as a single string with \\n between lines. \
-            Example: "x...x...x...x...  # 36\\n....x.......x...  # 38\\nx.x.x.x.x.x.x.x.  # A0" \
+            Example: "x...x...x...x... # 36\\n....x.......x... # 38\\nx.x.x.x.x.x.x.x. # A0" \
             MIDI is sent on channel 0 (the KO-II's default).
             """,
             inputSchema: .object([
@@ -228,7 +230,7 @@ struct ToolDefinition {
                 "properties": .object([
                     "pattern": .object([
                         "type": .string("string"),
-                        "description": .string("Multi-line drum pattern string. Use \\n to separate instrument lines.")
+                        "description": .string("Multi-line drum pattern string. Use \\n to separate instrument lines. Length per line should be a multiple of steps_per_bar (= beats_per_bar × steps_per_beat). Every character counts as one step — never use spaces for visual grouping.")
                     ]),
                     "bpm": .object([
                         "type": .string("number"),
@@ -241,7 +243,8 @@ struct ToolDefinition {
                     ]),
                     "steps_per_beat": .object([
                         "type": .string("integer"),
-                        "description": .string("Grid subdivision: 1=quarter, 2=eighth, 4=sixteenth (default), 3=eighth-triplet, 6=sixteenth-triplet.")
+                        "default": .int(4),
+                        "description": .string("Grid subdivision: 1=quarter, 2=eighth, 4=sixteenth, 3=eighth-triplet, 6=sixteenth-triplet.")
                     ])
                 ]),
                 "required": .array([.string("pattern"), .string("bpm")])
@@ -249,7 +252,7 @@ struct ToolDefinition {
         ),
         Tool(
             name: "list_available_scales",
-            description: "Lists all musical scales available for Keys Mode on the KO-II, with interval descriptions. Use this as a reference to compute MIDI notes for play_key_mode (e.g. C major from root 60 → 60, 62, 64, 65, 67, 69, 71).",
+            description: "Lists all musical scales available for Keys Mode on the KO-II with interval descriptions. Use this to pick the `scale_name` value for play_key_mode. You do NOT need to compute MIDI notes yourself — once you know the scale name, just pass `degree` (1-based) per step and the server resolves the MIDI note automatically.",
             inputSchema: .object(["type": .string("object"), "properties": .object([:])])
         )
     ]

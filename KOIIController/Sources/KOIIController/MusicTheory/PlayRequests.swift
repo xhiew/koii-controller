@@ -42,6 +42,9 @@ struct PlayPadRequest {
 struct PlayKeyModeRequest {
     let timing: SequenceTiming
     let steps: [SequenceStep]
+    let root: String
+    let scaleName: String
+    let defaultOctave: Int
     
     init(from arguments: [String: Value]?) throws {
         guard let args = arguments,
@@ -120,5 +123,8 @@ struct PlayKeyModeRequest {
         
         self.timing = timing
         self.steps = steps
+        self.root = rootName
+        self.scaleName = scaleName
+        self.defaultOctave = defaultOctave
     }
 }

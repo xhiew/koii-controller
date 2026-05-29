@@ -105,16 +105,40 @@ private extension ToolHandler {
 
 // MARK: Playback handlers
 private extension ToolHandler {
-    private static func playNoteCore(
-        group: KOIIGroup,
-        pad: Int,
-        velocity: UInt7,
-        timing: SequenceTiming,
-        durationSteps: Int
-    ) async throws {
-        try KOIIMIDIManager.shared.send(event: KOIIDevice.noteOn(group: group, pad: pad, velocity: velocity))
-        try await Task.sleep(nanoseconds: timing.holdNanoseconds(durationSteps: durationSteps))
-        try KOIIMIDIManager.shared.send(event: KOIIDevice.noteOff(group: group, pad: pad))
+    private struct PlayPadResponse: Encodable {
+        let status: String
+        let group: String
+        let pad: Int
+        let velocity: Int
+        let durationSteps: Int
+        let bpm: Double
+        let stepsPerBeat: Int
+        let stepMs: Double
+        let totalDurationMs: Double
+    }
+    
+    private struct PlayKeyModeResponse: Encodable {
+        let status: String
+        let notesPlayed: Int
+        let root: String
+        let scaleName: String
+        let defaultOctave: Int
+        let beatsPerBar: Int
+        let stepsPerBeat: Int
+        let bpm: Double
+        let stepMs: Double
+        let totalDurationMs: Double
+    }
+    
+    private struct DrumPatternResponse: Encodable {
+        let status: String
+        let instrumentsPlayed: Int
+        let steps: Int
+        let bars: Int
+        let beatsPerBar: Int
+        let bpm: Double
+        let stepMs: Double
+        let totalDurationMs: Double
     }
     
     static func playPad(_ arguments: [String: Value]?) async throws -> CallTool.Result {
@@ -122,21 +146,25 @@ private extension ToolHandler {
         
         let req = try PlayPadRequest(from: arguments)
         
-        try await playNoteCore(group: req.group, pad: req.pad, velocity: req.velocity, timing: req.timing, durationSteps: req.durationSteps)
+        try KOIIMIDIManager.shared.send(event: KOIIDevice.noteOn(group: req.group, pad: req.pad, velocity: req.velocity))
+        try await Task.sleep(nanoseconds: req.timing.holdNanoseconds(durationSteps: req.durationSteps))
+        try KOIIMIDIManager.shared.send(event: KOIIDevice.noteOff(group: req.group, pad: req.pad))
+        
+        let response = PlayPadResponse(
+            status: "OK",
+            group: req.group.rawValue,
+            pad: req.pad,
+            velocity: Int(req.velocity),
+            durationSteps: req.durationSteps,
+            bpm: req.timing.bpm,
+            stepsPerBeat: req.timing.stepsPerBeat,
+            stepMs: req.timing.stepDurationMs,
+            totalDurationMs: req.timing.stepDurationMs * Double(req.durationSteps)
+        )
         
         return CallTool.Result(
-            content: [.text(text: "Played \(req.group.rawValue)\(req.pad) at velocity \(req.velocity), held \(req.durationSteps) step(s) @ \(Int(req.timing.bpm)) BPM.", annotations: nil, _meta: nil)]
+            content: [.text(text: encodeJSON(response), annotations: nil, _meta: nil)]
         )
-    }
-    
-    private struct PlayKeyModeResponse: Encodable {
-        let status: String
-        let notesPlayed: Int
-        let beatsPerBar: Int
-        let stepsPerBeat: Int
-        let bpm: Double
-        let stepMs: Double
-        let totalDurationMs: Double
     }
     
     static func playKeyMode(_ arguments: [String: Value]?) async throws -> CallTool.Result {
@@ -163,6 +191,9 @@ private extension ToolHandler {
         let response = PlayKeyModeResponse(
             status: "OK",
             notesPlayed: req.steps.count,
+            root: req.root,
+            scaleName: req.scaleName,
+            defaultOctave: req.defaultOctave,
             beatsPerBar: req.timing.beatsPerBar,
             stepsPerBeat: req.timing.stepsPerBeat,
             bpm: req.timing.bpm,
@@ -173,17 +204,6 @@ private extension ToolHandler {
         return CallTool.Result(
             content: [.text(text: encodeJSON(response), annotations: nil, _meta: nil)]
         )
-    }
-    
-    private struct DrumPatternResponse: Encodable {
-        let status: String
-        let instrumentsPlayed: Int
-        let steps: Int
-        let bars: Int
-        let beatsPerBar: Int
-        let bpm: Double
-        let stepMs: Double
-        let totalDurationMs: Double
     }
     
     static func playDrumPattern(_ arguments: [String: Value]?) async throws -> CallTool.Result {
