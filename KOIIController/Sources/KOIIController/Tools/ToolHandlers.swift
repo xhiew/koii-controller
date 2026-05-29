@@ -132,11 +132,9 @@ private extension ToolHandler {
     private struct PlaySequenceResponse: Encodable {
         let status: String
         let notesPlayed: Int
-        let bars: Int
         let beatsPerBar: Int
         let bpm: Double
         let stepMs: Double
-        let totalDurationMs: Double
     }
     
     static func playSequence(_ arguments: [String: Value]?) async throws -> CallTool.Result {
@@ -158,11 +156,9 @@ private extension ToolHandler {
         let response = PlaySequenceResponse(
             status: "OK",
             notesPlayed: req.steps.count,
-            bars: req.totalBars,
             beatsPerBar: req.timing.beatsPerBar,
             bpm: req.timing.bpm,
             stepMs: req.timing.stepDurationMs,
-            totalDurationMs: req.timing.barDurationMs * Double(req.totalBars)
         )
         
         return CallTool.Result(

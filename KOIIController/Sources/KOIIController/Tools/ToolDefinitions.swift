@@ -118,10 +118,6 @@ struct ToolDefinition {
                         "type": .string("integer"),
                         "description": .string("Beats per bar. Common signatures: 4/4→4, 3/4→3, 5/4→5, 6/8→6 (pair with steps_per_beat=2). Total steps per bar = beats_per_bar × steps_per_beat. Default 4.")
                     ]),
-                    "bars": .object([
-                        "type": .string("integer"),
-                        "description": .string("Total length of the pattern in bars, used for response feedback. Default 1.")
-                    ]),
                     "steps_per_beat": .object([
                         "type": .string("integer"),
                         "description": .string("Grid subdivision: 1=quarter, 2=eighth, 4=sixteenth, 3=eighth-triplet, 6=sixteenth-triplet. Default 4.")

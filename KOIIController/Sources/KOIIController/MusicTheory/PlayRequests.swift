@@ -42,7 +42,6 @@ struct PlayPadRequest {
 struct PlaySequenceRequest {
     let timing: SequenceTiming
     let steps: [SequenceStep]
-    let totalBars: Int
     
     init(from arguments: [String: Value]?) throws {
         guard let args = arguments,
@@ -77,6 +76,5 @@ struct PlaySequenceRequest {
         
         self.timing = timing
         self.steps = steps
-        self.totalBars = args["bars"]?.intValue ?? 1
     }
 }
