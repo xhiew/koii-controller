@@ -58,7 +58,8 @@ struct ToolDefinition {
             bpm is required — set it to the KO-II's current tempo. \
             steps_per_beat sets the grid (4=16th, 2=8th, 1=quarter, 3=8th-triplet, 6=16th-triplet, default 4). \
             duration_steps controls how long to hold before noteOff (default 1). \
-            The server sends noteOn, waits duration_steps × (60000 / bpm / steps_per_beat) ms, then sends noteOff.
+            The server sends noteOn, waits duration_steps × (60000 / bpm / steps_per_beat) ms, then sends noteOff. \
+            MIDI is sent on channel 0 (the KO-II's default).
             """,
             inputSchema: .object([
                 "type": .string("object"),
@@ -109,7 +110,8 @@ struct ToolDefinition {
             and step_in_beat (1-based subdivision within the beat, default 1). \
             Example: bar=1 beat=3 step_in_beat=1 = downbeat of beat 3; bar=2 beat=1 step_in_beat=3 with steps_per_beat=4 = the 'e' of beat 1 in bar 2. \
             Steps are scheduled concurrently so polyphony and simultaneous hits work correctly. \
-            Use steps_per_beat=3 for eighth-triplet feel, 6 for sixteenth-triplet.
+            Use steps_per_beat=3 for eighth-triplet feel, 6 for sixteenth-triplet. \
+            MIDI is sent on channel 0 (the KO-II's default).
             """,
             inputSchema: .object([
                 "type": .string("object"),
@@ -193,7 +195,8 @@ struct ToolDefinition {
             Time signatures: 4/4 with 16th grid → 16 chars/bar; 3/4 with 16th grid → 12 chars/bar; 6/8 (steps_per_beat=2) → 12 chars/bar. \
             All voices are scheduled concurrently for accurate polyphony — no drift. \
             Pass the pattern as a single string with \\n between lines. \
-            Example: "x...x...x...x...  # 36\\n....x.......x...  # 38\\nx.x.x.x.x.x.x.x.  # A0"
+            Example: "x...x...x...x...  # 36\\n....x.......x...  # 38\\nx.x.x.x.x.x.x.x.  # A0" \
+            MIDI is sent on channel 0 (the KO-II's default).
             """,
             inputSchema: .object([
                 "type": .string("object"),
