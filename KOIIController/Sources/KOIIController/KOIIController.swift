@@ -1,11 +1,14 @@
-// The Swift Programming Language
-// https://docs.swift.org/swift-book
-
+import ArgumentParser
 import Foundation
+import MCP
 
 @main
-struct KOIIController {
-    static func main() {
-        print("run package")
+struct KOIIController: AsyncParsableCommand {
+    func run() async throws {
+        try KOIIMIDIManager.shared.start()
+        let server = await KOIIServer.createServer()
+        let transport = StdioTransport()
+        try await server.start(transport: transport)
+        try await Task.sleep(nanoseconds: .max)
     }
 }
