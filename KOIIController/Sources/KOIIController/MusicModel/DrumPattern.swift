@@ -24,6 +24,8 @@ struct DrumPatternRequest: Sendable {
     let stepCount: Int
     let totalBars: Int
     
+    var totalDurationMs: Double { timing.stepDurationMs * Double(stepCount) }
+    
     init(from args: [String: Value]?) throws {
         guard let args else { throw KOIIError.invalidParameter("arguments required") }
         guard let bpmInt = args["bpm"]?.intValue, bpmInt > 0 else { throw KOIIError.invalidParameter("bpm is required and must be > 0") }

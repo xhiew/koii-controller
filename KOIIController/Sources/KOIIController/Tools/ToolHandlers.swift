@@ -83,31 +83,20 @@ private extension ToolHandler {
     }
     
     static func listMidiOutputs() -> CallTool.Result {
-        let devices = KOIIMIDIManager.shared.listDestinations()
-        return CallTool.Result(
-            content: [.text(text: encodeJSON(ListOutputsPayload(devices: devices)), annotations: nil, _meta: nil)]
-        )
+        .success(ListOutputsPayload(devices: KOIIMIDIManager.shared.listDestinations()))
     }
     
     static func connectDevice(_ arguments: [String: Value]?) throws -> CallTool.Result {
-        guard let args = arguments,
-              case .string(let deviceName) = args["device_name"] else {
+        guard let deviceName = arguments?["device_name"]?.stringValue else {
             throw KOIIError.invalidParameter("device_name is required")
         }
-        
         try KOIIMIDIManager.shared.connect(deviceName: deviceName)
-        
-        return CallTool.Result(
-            content: [.text(text: "Connected to \"\(deviceName)\". (Note: this server is optimised for the EP-133 K.O. II)", annotations: nil, _meta: nil)]
-        )
+        return .message("Connected to \"\(deviceName)\". (Note: this server is optimised for the EP-133 K.O. II)")
     }
     
     static func disconnectDevice() -> CallTool.Result {
         KOIIMIDIManager.shared.disconnect()
-        
-        return CallTool.Result(
-            content: [.text(text: "The device has been disconnected.", annotations: nil, _meta: nil)]
-        )
+        return .message("The device has been disconnected.")
     }
 }
 
@@ -160,66 +149,31 @@ private extension ToolHandler {
 
 // MARK: Playback handlers
 private extension ToolHandler {
-    private struct PlayPadResponse: Encodable {
-        let status: String
-        let group: String
-        let pad: Int
-        let velocity: Int
-        let durationSteps: Int
-        let bpm: Double
-        let stepsPerBeat: Int
-        let stepMs: Double
-        let totalDurationMs: Double
-    }
-    
-    private struct PlayKeyModeResponse: Encodable {
-        let status: String
-        let notesPlayed: Int
-        let root: String
-        let scaleName: String
-        let defaultOctave: Int
-        let beatsPerBar: Int
-        let stepsPerBeat: Int
-        let bpm: Double
-        let stepMs: Double
-        let totalDurationMs: Double
-    }
-    
-    private struct DrumPatternResponse: Encodable {
-        let status: String
-        let instrumentsPlayed: Int
-        let steps: Int
-        let bars: Int
-        let beatsPerBar: Int
-        let bpm: Double
-        let stepMs: Double
-        let totalDurationMs: Double
-    }
-    
     static func playPad(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         try requireConnected()
-        
         let req = try PlayPadRequest(from: arguments)
         
         try KOIIMIDIManager.shared.send(event: KOIIDevice.noteOn(group: req.group, pad: req.pad, velocity: req.velocity))
         try await Task.sleep(nanoseconds: req.timing.holdNanoseconds(durationSteps: req.durationSteps))
         try KOIIMIDIManager.shared.send(event: KOIIDevice.noteOff(group: req.group, pad: req.pad))
         
-        let response = PlayPadResponse(
-            status: "OK",
-            group: req.group.rawValue,
-            pad: req.pad,
-            velocity: Int(req.velocity),
-            durationSteps: req.durationSteps,
-            bpm: req.timing.bpm,
-            stepsPerBeat: req.timing.stepsPerBeat,
-            stepMs: req.timing.stepDurationMs,
-            totalDurationMs: req.timing.stepDurationMs * Double(req.durationSteps)
+        return .success(
+            PlayPadResponse(
+                status: "OK",
+                group: req.group.rawValue,
+                pad: req.pad,
+                velocity: Int(req.velocity),
+                durationSteps: req.durationSteps,
+                bpm: req.timing.bpm,
+                stepsPerBeat: req.timing.stepsPerBeat,
+                stepMs: req.timing.stepDurationMs,
+                totalDurationMs: req.timing.stepDurationMs * Double(req.durationSteps)
+            )
         )
-        
-        return CallTool.Result(
-            content: [.text(text: encodeJSON(response), annotations: nil, _meta: nil)]
-        )
+    }
+    
+    static func listAvailableScales() -> CallTool.Result {
+        .success(KOIIScaleLibrary.descriptions)
     }
     
     static func playKeyMode(_ arguments: [String: Value]?) async throws -> CallTool.Result {
@@ -228,24 +182,19 @@ private extension ToolHandler {
         try await fireKeyMode(req)
         await PatternStage.shared.stage(.keyMode(req))
         
-        let maxEndStep = req.steps.map { $0.offsetSteps + $0.durationSteps }.max() ?? 0
-        let totalDurationMs = req.timing.stepDurationMs * Double(maxEndStep)
-        
-        let response = PlayKeyModeResponse(
-            status: "OK",
-            notesPlayed: req.steps.count,
-            root: req.root,
-            scaleName: req.scaleName,
-            defaultOctave: req.defaultOctave,
-            beatsPerBar: req.timing.beatsPerBar,
-            stepsPerBeat: req.timing.stepsPerBeat,
-            bpm: req.timing.bpm,
-            stepMs: req.timing.stepDurationMs,
-            totalDurationMs: totalDurationMs
-        )
-        
-        return CallTool.Result(
-            content: [.text(text: encodeJSON(response), annotations: nil, _meta: nil)]
+        return .success(
+            PlayKeyModeResponse(
+                status: "OK",
+                notesPlayed: req.steps.count,
+                root: req.root,
+                scaleName: req.scaleName,
+                defaultOctave: req.defaultOctave,
+                beatsPerBar: req.timing.beatsPerBar,
+                stepsPerBeat: req.timing.stepsPerBeat,
+                bpm: req.timing.bpm,
+                stepMs: req.timing.stepDurationMs,
+                totalDurationMs: req.totalDurationMs
+            )
         )
     }
     
@@ -255,27 +204,17 @@ private extension ToolHandler {
         try await fireDrum(req)
         await PatternStage.shared.stage(.drum(req))
         
-        let response = DrumPatternResponse(
-            status: "OK",
-            instrumentsPlayed: req.lines.count,
-            steps: req.stepCount,
-            bars: req.totalBars,
-            beatsPerBar: req.timing.beatsPerBar,
-            bpm: req.timing.bpm,
-            stepMs: req.timing.stepDurationMs,
-            totalDurationMs: req.timing.stepDurationMs * Double(req.stepCount)
-        )
-        return CallTool.Result(
-            content: [.text(text: encodeJSON(response), annotations: nil, _meta: nil)]
-        )
-    }
-}
-
-// MARK: Scale handlers
-private extension ToolHandler {
-    static func listAvailableScales() -> CallTool.Result {
-        CallTool.Result(
-            content: [.text(text: encodeJSON(KOIIScaleLibrary.descriptions), annotations: nil, _meta: nil)]
+        return .success(
+            DrumPatternResponse(
+                status: "OK",
+                instrumentsPlayed: req.lines.count,
+                steps: req.stepCount,
+                bars: req.totalBars,
+                beatsPerBar: req.timing.beatsPerBar,
+                bpm: req.timing.bpm,
+                stepMs: req.timing.stepDurationMs,
+                totalDurationMs: req.totalDurationMs
+            )
         )
     }
 }
@@ -302,16 +241,14 @@ private extension ToolHandler {
         }
         
         try KOIIMIDIManager.shared.send(event: event)
-        
-        return CallTool.Result(
-            content: [.text(text: "Transport \(label) sent.", annotations: nil, _meta: nil)]
-        )
+        return .message("Transport \(label) sent.")
     }
 }
 
 // MARK: Clock handlers
 private extension ToolHandler {
     static func startClock(_ arguments: [String: Value]?) throws -> CallTool.Result {
+        try requireConnected()
         guard let args = arguments,
               let bpm = args["bpm"]?.intValue,
               bpm > 0 else {
@@ -319,29 +256,17 @@ private extension ToolHandler {
         }
         try KOIIMIDIManager.shared.startClock(bpm: Double(bpm))
         let intervalMs = 60_000.0 / (Double(bpm) * 24)
-        return CallTool.Result(
-            content: [.text(text: "MIDI Clock started at \(bpm) BPM (interval: \(String(format: "%.2f", intervalMs)) ms, 24 PPQ).", annotations: nil, _meta: nil)]
-        )
+        return .message("MIDI Clock started at \(bpm) BPM (interval: \(String(format: "%.2f", intervalMs)) ms, 24 PPQ).")
     }
     
     static func stopClock() -> CallTool.Result {
         KOIIMIDIManager.shared.stopClock()
-        return CallTool.Result(
-            content: [.text(text: "MIDI Clock stopped.", annotations: nil, _meta: nil)]
-        )
+        return .message("MIDI Clock stopped.")
     }
 }
 
 // MARK: Pattern staging handlers
 private extension ToolHandler {
-    private struct FireStagedResponse: Encodable {
-        let status: String
-        let clockSynced: Bool
-        let countdownBeats: Int
-        let pattern: String
-        let totalDurationMs: Double
-    }
-    
     static func fireStagedPattern(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         try requireConnected()
         
@@ -359,54 +284,39 @@ private extension ToolHandler {
         }
         
         if countdownBeats > 0 {
-            // Wait countdown_beats to align with KO-II's count-in (applies whether clock is running or not)
-            let stageBpm: Double
-            switch staged {
-            case .drum(let r): stageBpm = r.timing.bpm
-            case .keyMode(let r): stageBpm = r.timing.bpm
-            }
-            let bpmForCountdown = KOIIMIDIManager.shared.clockBpm ?? stageBpm
+            // Prefer clock BPM so the countdown matches the external tempo source
+            let bpmForCountdown = KOIIMIDIManager.shared.clockBpm ?? staged.timing.bpm
             let beatNs = Int64(60_000_000_000 / bpmForCountdown)
             let fireAt = ContinuousClock.now + .nanoseconds(beatNs * Int64(countdownBeats))
             try await Task.sleep(until: fireAt, clock: .continuous)
         }
         
-        let totalDurationMs: Double
         switch staged {
-        case .drum(let req):
-            try await fireDrum(req)
-            totalDurationMs = req.timing.stepDurationMs * Double(req.stepCount)
-        case .keyMode(let req):
-            try await fireKeyMode(req)
-            let maxEnd = req.steps.map { $0.offsetSteps + $0.durationSteps }.max() ?? 0
-            totalDurationMs = req.timing.stepDurationMs * Double(maxEnd)
+        case .drum(let req): try await fireDrum(req)
+        case .keyMode(let req): try await fireKeyMode(req)
         }
         
         let summary = await stage.summary
-        let response = FireStagedResponse(
-            status: "OK",
-            clockSynced: clockRunning,
-            countdownBeats: countdownBeats,
-            pattern: summary,
-            totalDurationMs: totalDurationMs
-        )
-        return CallTool.Result(
-            content: [.text(text: encodeJSON(response), annotations: nil, _meta: nil)]
+        
+        return .success(
+            FireStagedResponse(
+                status: "OK",
+                clockSynced: clockRunning,
+                countdownBeats: countdownBeats,
+                pattern: summary,
+                totalDurationMs: staged.totalDurationMs
+            )
         )
     }
     
     static func clearStaged() async -> CallTool.Result {
         let cleared = await PatternStage.shared.clearAndSummarize()
-        struct ClearResponse: Encodable {
-            let status: String
-            let cleared: String
-        }
-        let response = ClearResponse(
-            status: "OK",
-            cleared: cleared == "empty" ? "nothing" : cleared
-        )
-        return CallTool.Result(
-            content: [.text(text: encodeJSON(response), annotations: nil, _meta: nil)]
+        
+        return .success(
+            ClearStagedResponse(
+                status: "OK",
+                cleared: cleared == "empty" ? "nothing" : cleared
+            )
         )
     }
 }

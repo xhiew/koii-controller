@@ -10,6 +10,20 @@ import Foundation
 enum StagedPattern {
     case drum(DrumPatternRequest)
     case keyMode(PlayKeyModeRequest)
+    
+    var timing: SequenceTiming {
+        switch self {
+        case .drum(let r): r.timing
+        case .keyMode(let r): r.timing
+        }
+    }
+    
+    var totalDurationMs: Double {
+        switch self {
+        case .drum(let r): r.totalDurationMs
+        case .keyMode(let r): r.totalDurationMs
+        }
+    }
 }
 
 actor PatternStage {

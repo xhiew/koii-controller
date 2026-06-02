@@ -62,8 +62,8 @@ struct PlayKeyModeRequest {
         guard beatsPerBar >= 1 else { throw KOIIError.invalidParameter("beats_per_bar must be >= 1") }
         guard stepsPerBeat >= 1 else { throw KOIIError.invalidParameter("steps_per_beat must be >= 1") }
         
-        let rootName: String = (args["root"].flatMap { if case .string(let s) = $0 { return s } else { return nil } }) ?? "C"
-        let scaleName: String = (args["scale_name"].flatMap { if case .string(let s) = $0 { return s } else { return nil } }) ?? "major"
+        let rootName = args["root"]?.stringValue ?? "C"
+        let scaleName = args["scale_name"]?.stringValue ?? "major"
         let defaultOctave = args["octave"]?.intValue ?? 4
         
         guard (0...9).contains(defaultOctave) else {
@@ -127,5 +127,10 @@ struct PlayKeyModeRequest {
         self.root = rootName
         self.scaleName = scaleName
         self.defaultOctave = defaultOctave
+    }
+    
+    var totalDurationMs: Double {
+        let maxEnd = steps.map { $0.offsetSteps + $0.durationSteps }.max() ?? 0
+        return timing.stepDurationMs * Double(maxEnd)
     }
 }

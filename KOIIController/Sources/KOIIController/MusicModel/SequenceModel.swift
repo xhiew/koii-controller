@@ -31,6 +31,9 @@ struct SequenceTiming {
     func holdNanoseconds(durationSteps: Int) -> UInt64 {
         UInt64(stepDurationMs * Double(durationSteps) * 1_000_000)
     }
+    
+    /// Nanoseconds per beat — centralises the 60_000_000_000 constant.
+    var beatNanoseconds: Int64 { Int64(60_000_000_000 / bpm) }
 }
 
 // MARK: SequenceStep
