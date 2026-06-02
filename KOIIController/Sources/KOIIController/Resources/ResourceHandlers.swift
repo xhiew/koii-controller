@@ -29,13 +29,27 @@ struct ResourceHandler {
                 connectedDeviceName: midi.connectedDeviceName
             )
             return .text(encodeJSON(payload), uri: uri, mimeType: "application/json")
-
+            
         case ResourceDefinition.deviceLayoutURI:
             let groups = KOIIGroup.allCases.map { group in
                 let base = Int(group.baseNote)
-                let pads = Dictionary(uniqueKeysWithValues: (1...12).map { pad in
-                    ("\(pad)", base + (pad - 1))
-                })
+                let groupName = group.rawValue
+                // Labels match KOIIDevice.noteNumber(padLabel:) convention
+                let padLabels: [(String, Int)] = [
+                    ("\(groupName).",  base),
+                    ("\(groupName)0",  base + 1),
+                    ("\(groupName)FX", base + 2),
+                    ("\(groupName)1",  base + 3),
+                    ("\(groupName)2",  base + 4),
+                    ("\(groupName)3",  base + 5),
+                    ("\(groupName)4",  base + 6),
+                    ("\(groupName)5",  base + 7),
+                    ("\(groupName)6",  base + 8),
+                    ("\(groupName)7",  base + 9),
+                    ("\(groupName)8",  base + 10),
+                    ("\(groupName)9",  base + 11),
+                ]
+                let pads = Dictionary(uniqueKeysWithValues: padLabels)
                 
                 return PadGroupLayout(
                     group: group.rawValue,
@@ -51,7 +65,7 @@ struct ResourceHandler {
                 uri: uri,
                 mimeType: "application/json"
             )
-
+            
         default:
             return .text(
                 #"{"error": "Unknown resource URI: \#(uri)"}"#,

@@ -22,7 +22,7 @@ enum ResourceDefinition {
         Resource(
             name: "device-status",
             uri: deviceStatusURI,
-            description: "Current MIDI connection state: isConnected, connectedDevice, availableDevices",
+            description: "Current MIDI connection state: isConnected, connectedDeviceName",
             mimeType: "application/json"
         )
     ]

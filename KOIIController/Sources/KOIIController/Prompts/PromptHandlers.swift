@@ -44,14 +44,16 @@ private extension PromptHandler {
         Generate a \(bars)-bar \(genre) drum beat on the Teenage Engineering KO-II at \(bpm) BPM.
         
         Steps:
+        0. Read resource `koii://device/status`. If `isConnected` is true, skip step 1 — the device is already connected.
         1. Call list_midi_outputs to find the KO-II's MIDI port name, then connect_device with that exact name. Do NOT guess the port name.
-        2. Design a drum kit. Common KO-II / GM mappings:
-           - 36 = kick    (A.)
-           - 38 = snare   (A0 / A1 area)
-           - 42 = closed hi-hat
-           - 46 = open hi-hat
-           - 39 = clap
-           You may reference by MIDI number (e.g. `# 36`) or pad label (e.g. `# A0`).
+        2. Design a drum kit. Read resource `koii://device/layout` to see the exact pad label → MIDI note mapping for this device. Common mappings:
+           - A.  (MIDI 36) = kick
+           - A0  (MIDI 37) = rimshot / side-stick
+           - AFX (MIDI 38) = snare
+           - A1  (MIDI 39) = clap
+           - A4  (MIDI 42) = closed hi-hat
+           - A6  (MIDI 44) = open hi-hat
+           You may reference by MIDI number (e.g. `# 36`) or pad label (e.g. `# A.`).
         3. Compose a multi-line text pattern for play_drum_pattern:
            - One line per instrument.
            - Each character = one grid step. Use 'x' = hard hit (vel 100), 'o' = soft (vel 60), '1'..'9' = graded velocity, '.' = rest.
@@ -89,15 +91,14 @@ private extension PromptHandler {
         let withDrums = (args["with_drums"]?.lowercased() == "true")
         
         let drumSection = withDrums ? """
-        
-        
-        After the melody is composed, also call play_drum_pattern in a SEPARATE tool call to layer a simple 1- or 2-bar drum loop (e.g. kick on beats 1 and 3, snare on beats 2 and 4, light hi-hat). Match the same bpm=\(bpm). Note: both calls block until their sequence completes, so dispatch the longer one first.
+        5. Call play_drum_pattern in a separate tool call to add a 1–2 bar rhythmic statement (e.g. kick on beats 1 and 3, snare on beats 2 and 4, light hi-hat). Match the same bpm=\(bpm). Note: tool calls are sequential — play_key_mode runs and finishes completely before play_drum_pattern starts. Keep the drum pattern short so it serves as a rhythmic coda.
         """ : ""
         
         let text = """
         Improvise a melodic phrase on the KO-II Keys Mode in \(key) \(scale) at \(bpm) BPM with a \(mood) mood.
         
         Steps:
+        0. Read resource `koii://device/status`. If `isConnected` is true, skip step 1 — the device is already connected.
         1. Call list_midi_outputs to find the KO-II's MIDI port name, then connect_device with that exact name. Do NOT guess.
         2. (Optional) Call list_available_scales if you want to pick a different scale that fits the mood better than "\(scale)".
         3. Design a 4- to 8-bar melody using musical scale degrees with play_key_mode:
