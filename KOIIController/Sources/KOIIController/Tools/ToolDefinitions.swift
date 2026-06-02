@@ -262,7 +262,7 @@ struct ToolDefinition {
             The clock runs continuously in the background (24 pulses per quarter note) and sets the KO-II's internal tempo. \
             Requires an active connection — call connect_device first. \
             Use this before recording into the KO-II sequencer so the device knows the tempo; \
-            then call fire_staged (when available) to trigger the pattern in sync. \
+            then call fire_staged to trigger the staged pattern with zero-jitter sync. \
             Call stop_clock when done to stop sending clock messages. \
             If a clock is already running it will be stopped and restarted at the new BPM.
             """,
@@ -281,6 +281,28 @@ struct ToolDefinition {
             name: "stop_clock",
             description: "Stops the MIDI Timing Clock that was started by start_clock. Safe to call even if no clock is running.",
             inputSchema: .object(["type": .string("object"), "properties": .object([:])])
+        ),
+        Tool(
+            name: "fire_staged",
+            description: """
+            Replays the most recently staged pattern without re-generating it. \
+            Patterns are automatically staged when you call play_drum_pattern or play_key_mode. \
+            Always waits countdown_beats (default 4) before firing notes — this matches the KO-II's built-in count-in before it starts recording. \
+            If MIDI Clock is running (start_clock was called): sends MIDI Start first so the KO-II begins its count-in, then waits the same countdown before firing notes. \
+            Clock sync is recommended: KO-II will lock tempo to the server, making the countdown timing more accurate. \
+            If no clock is running: just waits countdown_beats before firing (no MIDI Start sent). \
+            Throws if nothing has been staged yet — call play_drum_pattern or play_key_mode first.
+            """,
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "countdown_beats": .object([
+                        "type": .string("integer"),
+                        "default": .int(4),
+                        "description": .string("Beats to wait before firing notes. Default 4 matches the KO-II's standard count-in. Set to 0 to fire immediately (no count-in).")
+                    ])
+                ])
+            ])
         ),
         Tool(
             name: "clear_staged",

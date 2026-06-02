@@ -54,6 +54,8 @@ struct ToolHandler {
             return try startClock(params.arguments)
         case "stop_clock":
             return stopClock()
+        case "fire_staged":
+            return try await fireStagedPattern(params.arguments)
         case "clear_staged":
             return await clearStaged()
         default:
@@ -106,6 +108,53 @@ private extension ToolHandler {
         return CallTool.Result(
             content: [.text(text: "The device has been disconnected.", annotations: nil, _meta: nil)]
         )
+    }
+}
+
+// MARK: MIDI fire primitives
+// These functions accept pre-built request objects and send MIDI directly.
+// Used by both play_* handlers (preview) and fire_staged (record sync).
+private extension ToolHandler {
+    static func fireDrum(_ req: DrumPatternRequest) async throws {
+        let sequenceStart = ContinuousClock.now
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for step in 0..<req.stepCount {
+                let hits: [(UInt7, UInt7)] = req.lines.compactMap { line in
+                    guard step < line.hits.count, let velocity = line.hits[step] else { return nil }
+                    return (line.midiNote, velocity)
+                }
+                guard !hits.isEmpty else { continue }
+                let fireAt = sequenceStart + req.timing.fireTime(offsetSteps: step)
+                let holdNs = req.timing.holdNanoseconds(durationSteps: 1)
+                group.addTask {
+                    try await Task.sleep(until: fireAt, clock: .continuous)
+                    for (note, velocity) in hits {
+                        try KOIIMIDIManager.shared.send(event: KOIIDevice.rawNoteOn(note: note, velocity: velocity))
+                    }
+                    try await Task.sleep(nanoseconds: holdNs)
+                    for (note, _) in hits {
+                        try KOIIMIDIManager.shared.send(event: KOIIDevice.rawNoteOff(note: note))
+                    }
+                }
+            }
+            try await group.waitForAll()
+        }
+    }
+    
+    static func fireKeyMode(_ req: PlayKeyModeRequest) async throws {
+        let sequenceStart = ContinuousClock.now
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for step in req.steps {
+                group.addTask {
+                    let fireAt = sequenceStart + req.timing.fireTime(offsetSteps: step.offsetSteps)
+                    try await Task.sleep(until: fireAt, clock: .continuous)
+                    try KOIIMIDIManager.shared.send(event: KOIIDevice.rawNoteOn(note: step.midiNote, velocity: step.velocity))
+                    try await Task.sleep(nanoseconds: req.timing.holdNanoseconds(durationSteps: step.durationSteps))
+                    try KOIIMIDIManager.shared.send(event: KOIIDevice.rawNoteOff(note: step.midiNote))
+                }
+            }
+            try await group.waitForAll()
+        }
     }
 }
 
@@ -176,20 +225,8 @@ private extension ToolHandler {
     static func playKeyMode(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         try requireConnected()
         let req = try PlayKeyModeRequest(from: arguments)
-        let sequenceStart = ContinuousClock.now
-        
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            for step in req.steps {
-                group.addTask {
-                    let fireAt = sequenceStart + req.timing.fireTime(offsetSteps: step.offsetSteps)
-                    try await Task.sleep(until: fireAt, clock: .continuous)
-                    try KOIIMIDIManager.shared.send(event: KOIIDevice.rawNoteOn(note: step.midiNote, velocity: step.velocity))
-                    try await Task.sleep(nanoseconds: req.timing.holdNanoseconds(durationSteps: step.durationSteps))
-                    try KOIIMIDIManager.shared.send(event: KOIIDevice.rawNoteOff(note: step.midiNote))
-                }
-            }
-            try await group.waitForAll()
-        }
+        try await fireKeyMode(req)
+        await PatternStage.shared.stage(.keyMode(req))
         
         let maxEndStep = req.steps.map { $0.offsetSteps + $0.durationSteps }.max() ?? 0
         let totalDurationMs = req.timing.stepDurationMs * Double(maxEndStep)
@@ -215,32 +252,8 @@ private extension ToolHandler {
     static func playDrumPattern(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         try requireConnected()
         let req = try DrumPatternRequest(from: arguments)
-        let sequenceStart = ContinuousClock.now
-        
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            for step in 0..<req.stepCount {
-                let hits: [(UInt7, UInt7)] = req.lines.compactMap { line in
-                    guard step < line.hits.count, let velocity = line.hits[step] else { return nil }
-                    return (line.midiNote, velocity)
-                }
-                guard !hits.isEmpty else { continue }
-                
-                let fireAt = sequenceStart + req.timing.fireTime(offsetSteps: step)
-                let holdNs = req.timing.holdNanoseconds(durationSteps: 1)
-                
-                group.addTask {
-                    try await Task.sleep(until: fireAt, clock: .continuous)
-                    for (note, velocity) in hits {
-                        try KOIIMIDIManager.shared.send(event: KOIIDevice.rawNoteOn(note: note, velocity: velocity))
-                    }
-                    try await Task.sleep(nanoseconds: holdNs)
-                    for (note, _) in hits {
-                        try KOIIMIDIManager.shared.send(event: KOIIDevice.rawNoteOff(note: note))
-                    }
-                }
-            }
-            try await group.waitForAll()
-        }
+        try await fireDrum(req)
+        await PatternStage.shared.stage(.drum(req))
         
         let response = DrumPatternResponse(
             status: "OK",
@@ -321,12 +334,79 @@ private extension ToolHandler {
 
 // MARK: Pattern staging handlers
 private extension ToolHandler {
-    static func clearStaged() async -> CallTool.Result {
-        let wasEmpty = await PatternStage.shared.isEmpty
-        await PatternStage.shared.clear()
-        let msg = wasEmpty ? "Nothing was staged." : "Staged patterns cleared."
+    private struct FireStagedResponse: Encodable {
+        let status: String
+        let clockSynced: Bool
+        let countdownBeats: Int
+        let pattern: String
+        let totalDurationMs: Double
+    }
+    
+    static func fireStagedPattern(_ arguments: [String: Value]?) async throws -> CallTool.Result {
+        try requireConnected()
+        
+        let stage = PatternStage.shared
+        guard let staged = await stage.staged else {
+            throw KOIIError.invalidParameter("Nothing staged. Call play_drum_pattern or play_key_mode first.")
+        }
+        
+        let countdownBeats = arguments?["countdown_beats"]?.intValue ?? 4
+        let clockRunning = KOIIMIDIManager.shared.clockBpm != nil
+        
+        if clockRunning {
+            // Send Start so KO-II begins its count-in, then wait the same countdown before firing notes
+            try KOIIMIDIManager.shared.send(event: KOIIDevice.transportStart())
+        }
+        
+        if countdownBeats > 0 {
+            // Wait countdown_beats to align with KO-II's count-in (applies whether clock is running or not)
+            let stageBpm: Double
+            switch staged {
+            case .drum(let r): stageBpm = r.timing.bpm
+            case .keyMode(let r): stageBpm = r.timing.bpm
+            }
+            let bpmForCountdown = KOIIMIDIManager.shared.clockBpm ?? stageBpm
+            let beatNs = Int64(60_000_000_000 / bpmForCountdown)
+            let fireAt = ContinuousClock.now + .nanoseconds(beatNs * Int64(countdownBeats))
+            try await Task.sleep(until: fireAt, clock: .continuous)
+        }
+        
+        let totalDurationMs: Double
+        switch staged {
+        case .drum(let req):
+            try await fireDrum(req)
+            totalDurationMs = req.timing.stepDurationMs * Double(req.stepCount)
+        case .keyMode(let req):
+            try await fireKeyMode(req)
+            let maxEnd = req.steps.map { $0.offsetSteps + $0.durationSteps }.max() ?? 0
+            totalDurationMs = req.timing.stepDurationMs * Double(maxEnd)
+        }
+        
+        let summary = await stage.summary
+        let response = FireStagedResponse(
+            status: "OK",
+            clockSynced: clockRunning,
+            countdownBeats: countdownBeats,
+            pattern: summary,
+            totalDurationMs: totalDurationMs
+        )
         return CallTool.Result(
-            content: [.text(text: msg, annotations: nil, _meta: nil)]
+            content: [.text(text: encodeJSON(response), annotations: nil, _meta: nil)]
+        )
+    }
+    
+    static func clearStaged() async -> CallTool.Result {
+        let cleared = await PatternStage.shared.clearAndSummarize()
+        struct ClearResponse: Encodable {
+            let status: String
+            let cleared: String
+        }
+        let response = ClearResponse(
+            status: "OK",
+            cleared: cleared == "empty" ? "nothing" : cleared
+        )
+        return CallTool.Result(
+            content: [.text(text: encodeJSON(response), annotations: nil, _meta: nil)]
         )
     }
 }

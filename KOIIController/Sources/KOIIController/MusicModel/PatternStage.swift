@@ -7,29 +7,38 @@
 
 import Foundation
 
+enum StagedPattern {
+    case drum(DrumPatternRequest)
+    case keyMode(PlayKeyModeRequest)
+}
+
 actor PatternStage {
     static let shared = PatternStage()
     private init() {}
     
-    private(set) var drumPattern: DrumPatternRequest?
-    private(set) var keyMode: PlayKeyModeRequest?
+    private(set) var staged: StagedPattern?
     
-    var isEmpty: Bool { drumPattern == nil && keyMode == nil }
+    var isEmpty: Bool { staged == nil }
     
-    func stageDrum(_ req: DrumPatternRequest) { drumPattern = req }
+    func stage(_ pattern: StagedPattern) { staged = pattern }
     
-    func stageKeyMode(_ req: PlayKeyModeRequest) { keyMode = req }
+    func clear() { staged = nil }
     
-    func clear() { drumPattern = nil; keyMode = nil }
+    // Captures summary then clears atomically (single actor turn — no race window).
+    func clearAndSummarize() -> String {
+        let s = summary
+        staged = nil
+        return s
+    }
     
     var summary: String {
-        var parts: [String] = []
-        if let d = drumPattern {
-            parts.append("drum: \(d.lines.count) instruments, \(d.stepCount) steps, \(d.totalBars) bars @ \(d.timing.bpm) BPM")
+        switch staged {
+        case .drum(let d):
+            return "drum: \(d.lines.count) instruments, \(d.stepCount) steps, \(d.totalBars) bars @ \(Int(d.timing.bpm)) BPM"
+        case .keyMode(let k):
+            return "key_mode: \(k.steps.count) notes, \(k.root) \(k.scaleName) @ \(Int(k.timing.bpm)) BPM"
+        case nil:
+            return "empty"
         }
-        if let k = keyMode {
-            parts.append("key_mode: \(k.steps.count) notes, \(k.root) \(k.scaleName) @ \(k.timing.bpm) BPM")
-        }
-        return parts.isEmpty ? "empty" : parts.joined(separator: "; ")
     }
 }
