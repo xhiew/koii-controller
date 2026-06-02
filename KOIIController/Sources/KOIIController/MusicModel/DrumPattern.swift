@@ -26,11 +26,11 @@ struct DrumPatternRequest: Sendable {
     
     init(from args: [String: Value]?) throws {
         guard let args else { throw KOIIError.invalidParameter("arguments required") }
-        guard let bpm = args["bpm"]?.doubleValue, bpm > 0 else { throw KOIIError.invalidParameter("bpm is required and must be > 0") }
+        guard let bpmInt = args["bpm"]?.intValue, bpmInt > 0 else { throw KOIIError.invalidParameter("bpm is required and must be > 0") }
         guard case .string(let text) = args["pattern"] else { throw KOIIError.invalidParameter("pattern is required (multi-line string)") }
         
         let beatsPerBar = args["beats_per_bar"]?.intValue ?? 4
-        timing = SequenceTiming(bpm: bpm, stepsPerBeat: args["steps_per_beat"]?.intValue ?? 4, beatsPerBar: beatsPerBar)
+        timing = SequenceTiming(bpm: Double(bpmInt), stepsPerBeat: args["steps_per_beat"]?.intValue ?? 4, beatsPerBar: beatsPerBar)
         lines = try Self.parseLines(text)
         
         guard !lines.isEmpty else { throw KOIIError.invalidParameter("No valid pattern lines found — check instrument references") }

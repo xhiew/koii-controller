@@ -27,7 +27,7 @@ struct PlayPadRequest {
             throw KOIIError.invalidParameter("Unknown group: \"\(groupStr)\". Use A, B, C, or D.")
         }
         
-        guard let bpm = args["bpm"]?.doubleValue, bpm > 0 else {
+        guard let bpmInt = args["bpm"]?.intValue, bpmInt > 0 else {
             throw KOIIError.invalidParameter("bpm is required and must be > 0")
         }
         
@@ -35,7 +35,7 @@ struct PlayPadRequest {
         self.pad = padVal
         self.velocity = args["velocity"]?.intValue.flatMap { UInt7(exactly: $0) } ?? 80
         self.durationSteps = args["duration_steps"]?.intValue ?? 1
-        self.timing = SequenceTiming(bpm: bpm, stepsPerBeat: args["steps_per_beat"]?.intValue ?? 4, beatsPerBar: 4)
+        self.timing = SequenceTiming(bpm: Double(bpmInt), stepsPerBeat: args["steps_per_beat"]?.intValue ?? 4, beatsPerBar: 4)
     }
 }
 
@@ -48,10 +48,11 @@ struct PlayKeyModeRequest {
     
     init(from arguments: [String: Value]?) throws {
         guard let args = arguments,
-              let bpmVal = args["bpm"]?.doubleValue, bpmVal > 0,
+              let bpmInt = args["bpm"]?.intValue, bpmInt > 0,
               case .array(let stepsArr) = args["steps"] else {
             throw KOIIError.invalidParameter("bpm and steps are required")
         }
+        let bpmVal = Double(bpmInt)
         
         guard !stepsArr.isEmpty else { throw KOIIError.invalidParameter("steps must contain at least one note") }
         

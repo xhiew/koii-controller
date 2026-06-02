@@ -41,6 +41,8 @@ final class KOIIMIDIManager: @unchecked Sendable {
     
     private let connectionTag = "koii-output"
     private(set) var connectedDeviceName: String?
+    private var clockTask: Task<Void, Never>?
+    private(set) var clockBpm: Double?
     
     private init() {}
     
@@ -88,5 +90,28 @@ final class KOIIMIDIManager: @unchecked Sendable {
             throw KOIIError.notConnected
         }
         try connection.send(events: events)
+    }
+    
+    func startClock(bpm: Double) throws {
+        guard isConnected else { throw KOIIError.notConnected }
+        guard bpm > 0 else { throw KOIIError.invalidParameter("bpm must be > 0") }
+        stopClock()
+        clockBpm = bpm
+        let intervalNs = Int64(60_000_000_000 / (bpm * 24))
+        clockTask = Task {
+            var next = ContinuousClock.now
+            while !Task.isCancelled {
+                try? await Task.sleep(until: next, clock: .continuous)
+                guard !Task.isCancelled else { break }
+                try? send(event: KOIIDevice.timingClock())
+                next = next + .nanoseconds(intervalNs)
+            }
+        }
+    }
+    
+    func stopClock() {
+        clockTask?.cancel()
+        clockTask = nil
+        clockBpm = nil
     }
 }

@@ -83,7 +83,7 @@ struct ToolDefinition {
                         "description": .string("Velocity 0–127. Common values: 100=hard accent, 80=normal hit, 60=soft, 30=ghost note.")
                     ]),
                     "bpm": .object([
-                        "type": .string("number"),
+                        "type": .string("integer"),
                         "description": .string("The KO-II's current BPM, as set on the device. Required to calculate hold duration.")
                     ]),
                     "steps_per_beat": .object([
@@ -124,7 +124,7 @@ struct ToolDefinition {
                 "type": .string("object"),
                 "properties": .object([
                     "bpm": .object([
-                        "type": .string("number"),
+                        "type": .string("integer"),
                         "description": .string("The KO-II's current BPM.")
                     ]),
                     "beats_per_bar": .object([
@@ -233,7 +233,7 @@ struct ToolDefinition {
                         "description": .string("Multi-line drum pattern string. Use \\n to separate instrument lines. Length per line should be a multiple of steps_per_bar (= beats_per_bar × steps_per_beat). Every character counts as one step — never use spaces for visual grouping.")
                     ]),
                     "bpm": .object([
-                        "type": .string("number"),
+                        "type": .string("integer"),
                         "description": .string("The KO-II's current BPM.")
                     ]),
                     "beats_per_bar": .object([
@@ -253,6 +253,38 @@ struct ToolDefinition {
         Tool(
             name: "list_available_scales",
             description: "Lists all musical scales available for Keys Mode on the KO-II with interval descriptions. Use this to pick the `scale_name` value for play_key_mode. You do NOT need to compute MIDI notes yourself — once you know the scale name, just pass `degree` (1-based) per step and the server resolves the MIDI note automatically.",
+            inputSchema: .object(["type": .string("object"), "properties": .object([:])])
+        ),
+        Tool(
+            name: "start_clock",
+            description: """
+            Starts sending MIDI Timing Clock to the KO-II at the specified BPM. \
+            The clock runs continuously in the background (24 pulses per quarter note) and sets the KO-II's internal tempo. \
+            Requires an active connection — call connect_device first. \
+            Use this before recording into the KO-II sequencer so the device knows the tempo; \
+            then call fire_staged (when available) to trigger the pattern in sync. \
+            Call stop_clock when done to stop sending clock messages. \
+            If a clock is already running it will be stopped and restarted at the new BPM.
+            """,
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "bpm": .object([
+                        "type": .string("integer"),
+                        "description": .string("Desired tempo in BPM. Must be > 0. Match the BPM used in play_drum_pattern or play_key_mode.")
+                    ])
+                ]),
+                "required": .array([.string("bpm")])
+            ])
+        ),
+        Tool(
+            name: "stop_clock",
+            description: "Stops the MIDI Timing Clock that was started by start_clock. Safe to call even if no clock is running.",
+            inputSchema: .object(["type": .string("object"), "properties": .object([:])])
+        ),
+        Tool(
+            name: "clear_staged",
+            description: "Clears any drum pattern or key mode sequence that was staged (saved) by play_drum_pattern or play_key_mode. Use this when you want to start fresh before composing a new pattern.",
             inputSchema: .object(["type": .string("object"), "properties": .object([:])])
         )
     ]
