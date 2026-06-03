@@ -64,7 +64,7 @@ struct PlayKeyModeRequest {
         
         let rootName = args["root"]?.stringValue ?? "C"
         let scaleName = args["scale_name"]?.stringValue ?? "major"
-        let defaultOctave = args["octave"]?.intValue ?? 4
+        let defaultOctave = args["octave"]?.intValue ?? 5
         
         guard (0...9).contains(defaultOctave) else {
             throw KOIIError.invalidParameter("octave must be in 0...9, got \(defaultOctave)")

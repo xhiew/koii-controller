@@ -110,7 +110,7 @@ struct ToolDefinition {
             (e.g. in C major: degree=1 → C, degree=8 → C one octave higher, degree=15 → C two octaves higher). \
             Each step can optionally override the sequence-wide octave to shape melody contour. \
             For atonal or chromatic passages, set scale_name="chromatic" and use degrees 1–12 for the 12 semitones. \
-            Octave numbering follows Yamaha convention: C4 = middle C = MIDI 60. Useful octaves: 3 (low/bass), 4 (middle), 5 (high). \
+            Octave numbering follows Yamaha convention: C4 = middle C = MIDI 60. Default is octave 5, matching the KO-II hardware's default pitch range. Useful octaves: 3 (low/bass), 4 (middle), 5 (high/default). \
             Position each note by musical time — bar (1-based), beat (1-based within bar), \
             and step_in_beat (1-based subdivision within the beat, default 1). \
             Example: bar=1 beat=3 step_in_beat=1 = downbeat of beat 3; bar=2 beat=1 step_in_beat=3 with steps_per_beat=4 = the 'e' of beat 1 in bar 2. \
@@ -118,7 +118,7 @@ struct ToolDefinition {
             Use steps_per_beat=3 for eighth-triplet feel, 6 for sixteenth-triplet. \
             Call list_available_scales to see all 11 supported scales. \
             MIDI is sent on channel 0 (the KO-II's default). \
-            Example: {"bpm":120,"root":"C","scale_name":"major","octave":4,"steps":[{"degree":1,"bar":1,"beat":1},{"degree":3,"bar":1,"beat":2},{"degree":5,"bar":1,"beat":3},{"degree":8,"bar":1,"beat":4},{"degree":5,"bar":2,"beat":1,"octave":5,"duration_steps":4}]}
+            Example: {"bpm":120,"root":"C","scale_name":"major","octave":5,"steps":[{"degree":1,"bar":1,"beat":1},{"degree":3,"bar":1,"beat":2},{"degree":5,"bar":1,"beat":3},{"degree":8,"bar":1,"beat":4},{"degree":5,"bar":2,"beat":1,"octave":6,"duration_steps":4}]}
             """,
             inputSchema: .object([
                 "type": .string("object"),
@@ -151,8 +151,8 @@ struct ToolDefinition {
                         "type": .string("integer"),
                         "minimum": .int(0),
                         "maximum": .int(9),
-                        "default": .int(4),
-                        "description": .string("Default octave for all steps (per-step octave overrides this). Yamaha convention: C4 = middle C = MIDI 60.")
+                        "default": .int(5),
+                        "description": .string("Default octave for all steps (per-step octave overrides this). Yamaha convention: C4 = middle C = MIDI 60. Default 5 matches the KO-II hardware default pitch range.")
                     ]),
                     "steps": .object([
                         "type": .string("array"),
@@ -285,12 +285,14 @@ struct ToolDefinition {
         Tool(
             name: "fire_staged",
             description: """
-            Replays the most recently staged pattern without re-generating it. \
-            Patterns are automatically staged when you call play_drum_pattern or play_key_mode. \
-            Always waits countdown_beats (default 4) before firing notes — this matches the KO-II's built-in count-in before it starts recording. \
-            If MIDI Clock is running (start_clock was called): sends MIDI Start first so the KO-II begins its count-in, then waits the same countdown before firing notes. \
-            Clock sync is recommended: KO-II will lock tempo to the server, making the countdown timing more accurate. \
-            If no clock is running: just waits countdown_beats before firing (no MIDI Start sent). \
+            Records the most recently staged pattern into the KO-II sequencer. \
+            Call this when the user wants to record, save, or write a pattern to the KO-II — for example: \
+            "record this", "record the pattern", "record lại pattern vừa rồi", "ghi vào máy", "fire", "save to KO-II". \
+            Patterns are automatically staged after every play_drum_pattern or play_key_mode call. \
+            Workflow: put the KO-II into record-ready mode, then call fire_staged — the server sends MIDI Start \
+            to trigger the KO-II's built-in count-in, waits the same number of beats (countdown_beats, default 4), \
+            then fires the notes so they land exactly on bar 1 beat 1 of the recording. \
+            Set countdown_beats=0 to skip count-in and fire immediately (useful for live preview, not recording). \
             Throws if nothing has been staged yet — call play_drum_pattern or play_key_mode first.
             """,
             inputSchema: .object([
@@ -299,7 +301,7 @@ struct ToolDefinition {
                     "countdown_beats": .object([
                         "type": .string("integer"),
                         "default": .int(4),
-                        "description": .string("Beats to wait before firing notes. Default 4 matches the KO-II's standard count-in. Set to 0 to fire immediately (no count-in).")
+                        "description": .string("Beats to wait after MIDI Start before firing notes. Default 4 matches the KO-II's standard 4-beat count-in. Set to 0 to fire immediately with no count-in.")
                     ])
                 ])
             ])

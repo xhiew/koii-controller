@@ -276,14 +276,10 @@ private extension ToolHandler {
         }
         
         let countdownBeats = arguments?["countdown_beats"]?.intValue ?? 4
-        let clockRunning = KOIIMIDIManager.shared.clockBpm != nil
-        
-        if clockRunning {
-            // Send Start so KO-II begins its count-in, then wait the same countdown before firing notes
-            try KOIIMIDIManager.shared.send(event: KOIIDevice.transportStart())
-        }
         
         if countdownBeats > 0 {
+            // Send MIDI Start to trigger KO-II's count-in in sync with our own countdown
+            try KOIIMIDIManager.shared.send(event: KOIIDevice.transportStart())
             // Prefer clock BPM so the countdown matches the external tempo source
             let bpmForCountdown = KOIIMIDIManager.shared.clockBpm ?? staged.timing.bpm
             let beatNs = Int64(60_000_000_000 / bpmForCountdown)
@@ -301,7 +297,7 @@ private extension ToolHandler {
         return .success(
             FireStagedResponse(
                 status: "OK",
-                clockSynced: clockRunning,
+                startSent: countdownBeats > 0,
                 countdownBeats: countdownBeats,
                 pattern: summary,
                 totalDurationMs: staged.totalDurationMs
