@@ -50,14 +50,6 @@ struct ToolHandler {
             return try await playDrumPattern(params.arguments)
         case "list_available_scales":
             return listAvailableScales()
-        case "start_clock":
-            return try startClock(params.arguments)
-        case "stop_clock":
-            return stopClock()
-        case "fire_staged":
-            return try await fireStagedPattern(params.arguments)
-        case "clear_staged":
-            return await clearStaged()
         default:
             return CallTool.Result(
                 content: [.text(text: "Unknown tool: \(params.name)", annotations: nil, _meta: nil)],
@@ -180,8 +172,7 @@ private extension ToolHandler {
         try requireConnected()
         let req = try PlayKeyModeRequest(from: arguments)
         try await fireKeyMode(req)
-        await PatternStage.shared.stage(.keyMode(req))
-        
+
         return .success(
             PlayKeyModeResponse(
                 status: "OK",
@@ -202,8 +193,7 @@ private extension ToolHandler {
         try requireConnected()
         let req = try DrumPatternRequest(from: arguments)
         try await fireDrum(req)
-        await PatternStage.shared.stage(.drum(req))
-        
+
         return .success(
             DrumPatternResponse(
                 status: "OK",
@@ -242,78 +232,6 @@ private extension ToolHandler {
         
         try KOIIMIDIManager.shared.send(event: event)
         return .message("Transport \(label) sent.")
-    }
-}
-
-// MARK: Clock handlers
-private extension ToolHandler {
-    static func startClock(_ arguments: [String: Value]?) throws -> CallTool.Result {
-        try requireConnected()
-        guard let args = arguments,
-              let bpm = args["bpm"]?.intValue,
-              bpm > 0 else {
-            throw KOIIError.invalidParameter("bpm is required and must be > 0")
-        }
-        try KOIIMIDIManager.shared.startClock(bpm: Double(bpm))
-        let intervalMs = 60_000.0 / (Double(bpm) * 24)
-        return .message("MIDI Clock started at \(bpm) BPM (interval: \(String(format: "%.2f", intervalMs)) ms, 24 PPQ).")
-    }
-    
-    static func stopClock() -> CallTool.Result {
-        KOIIMIDIManager.shared.stopClock()
-        return .message("MIDI Clock stopped.")
-    }
-}
-
-// MARK: Pattern staging handlers
-private extension ToolHandler {
-    static func fireStagedPattern(_ arguments: [String: Value]?) async throws -> CallTool.Result {
-        try requireConnected()
-        
-        let stage = PatternStage.shared
-        guard let staged = await stage.staged else {
-            throw KOIIError.invalidParameter("Nothing staged. Call play_drum_pattern or play_key_mode first.")
-        }
-        
-        let countdownBeats = arguments?["countdown_beats"]?.intValue ?? 4
-        
-        if countdownBeats > 0 {
-            // Send MIDI Start to trigger KO-II's count-in in sync with our own countdown
-            try KOIIMIDIManager.shared.send(event: KOIIDevice.transportStart())
-            // Prefer clock BPM so the countdown matches the external tempo source
-            let bpmForCountdown = KOIIMIDIManager.shared.clockBpm ?? staged.timing.bpm
-            let beatNs = Int64(60_000_000_000 / bpmForCountdown)
-            let fireAt = ContinuousClock.now + .nanoseconds(beatNs * Int64(countdownBeats))
-            try await Task.sleep(until: fireAt, clock: .continuous)
-        }
-        
-        switch staged {
-        case .drum(let req): try await fireDrum(req)
-        case .keyMode(let req): try await fireKeyMode(req)
-        }
-        
-        let summary = await stage.summary
-        
-        return .success(
-            FireStagedResponse(
-                status: "OK",
-                startSent: countdownBeats > 0,
-                countdownBeats: countdownBeats,
-                pattern: summary,
-                totalDurationMs: staged.totalDurationMs
-            )
-        )
-    }
-    
-    static func clearStaged() async -> CallTool.Result {
-        let cleared = await PatternStage.shared.clearAndSummarize()
-        
-        return .success(
-            ClearStagedResponse(
-                status: "OK",
-                cleared: cleared == "empty" ? "nothing" : cleared
-            )
-        )
     }
 }
 

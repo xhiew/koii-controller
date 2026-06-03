@@ -102,7 +102,7 @@ private extension PromptHandler {
         1. Call list_midi_outputs to find the KO-II's MIDI port name, then connect_device with that exact name. Do NOT guess.
         2. (Optional) Call list_available_scales if you want to pick a different scale that fits the mood better than "\(scale)".
         3. Design a 4- to 8-bar melody using musical scale degrees with play_key_mode:
-           - root="\(key)", scale_name="\(scale)", octave=4 (middle register).
+           - root="\(key)", scale_name="\(scale)", octave=5 (KO-II default pitch range).
            - Each step picks `degree` (1-based). degree=1 is the root note. In a 7-note scale, degree=8 is the root one octave up.
            - Per-step `octave` override is great for emphasis (jump up or down an octave on key notes).
            - Position notes by `bar` (1-based), `beat` (1-based, ≤ beats_per_bar), and `step_in_beat` (1-based, ≤ steps_per_beat).

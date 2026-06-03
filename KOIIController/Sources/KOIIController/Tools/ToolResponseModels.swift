@@ -43,16 +43,3 @@ struct DrumPatternResponse: Encodable {
     let stepMs: Double
     let totalDurationMs: Double
 }
-
-struct FireStagedResponse: Encodable {
-    let status: String
-    let startSent: Bool
-    let countdownBeats: Int
-    let pattern: String
-    let totalDurationMs: Double
-}
-
-struct ClearStagedResponse: Encodable {
-    let status: String
-    let cleared: String
-}
