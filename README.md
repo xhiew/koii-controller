@@ -152,7 +152,3 @@ Within each group:
 Inspired by [mcp-koii](https://github.com/benjaminr/mcp-koii) by [@benjaminr](https://github.com/benjaminr) — a Python-based MCP server for the KO-II that sparked the idea for this Swift implementation.
 
 ---
-
-## License
-
-MIT
